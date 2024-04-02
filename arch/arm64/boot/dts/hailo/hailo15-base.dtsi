@@ -417,6 +417,7 @@
             reg = <0>;
             vid0_in: vid0_in {
                 reg = <0>;
+                sink = <1>;
                 path = <0>;
                 remote-endpoint = <&isp_out_vid0>;
             };
@@ -424,7 +425,8 @@
         port@1{
 	    reg = <1>;
 	    vid1_in: vid1_in {
-                reg = <0>;
+                reg = <1>;
+                sink = <1>;
                 path = <1>;
                 remote-endpoint = <&isp_out_vid1>;
 	    };
@@ -433,13 +435,32 @@
         port@2{
             reg = <2>;
             vid2_in: vid2_in {
-                reg = <0>;
+                reg = <2>;
+                sink = <1>;
                 path = <2>;
                 remote-endpoint = <&rxwrapper_out_vid2>;
             };
         };
     };
     };
+
+    hailo_vid_out: video_out {
+        status = "ok";
+        compatible = "hailo,vid-out";
+
+        ports {
+            port@0{
+                reg = <0>;
+                vid_out_0_out: vid_out_0_out {
+                    reg = <0>;
+                    sink = <1>;
+                    path = <3>;
+                    remote-endpoint = <&isp_in_vid_out0>;
+        	    };
+	        };
+    	};
+    };
+
 
     hailo_isp: isp@7C000000 {
         status = "disabled";
@@ -454,22 +475,31 @@
             port@0 {
                 reg = <0>;
                 isp_in_rxwrapper: isp_in_rxwrapper {
+		    sink = <1>;
                     remote-endpoint = <&rxwrapper_out_isp>;
                 };
             };
         port@2 {
         reg = <2>;
         isp_out_vid0: isp_out_vid0 {
+	    sink = <0>;
             remote-endpoint = <&vid0_in>;
         };
         };
-	port@3 {
-	reg = <3>;
+	port@4 {
+	reg = <4>;
 	isp_out_vid1: isp_out_vid1{
+	    sink = <0>;
 	    remote-endpoint = <&vid1_in>;
 	};
-	
-        };
+	};
+	port@5 {
+            reg = <5>;
+            isp_in_vid_out0: isp_in_vid_out0 {
+                sink = <0>;
+                remote-endpoint = <&vid_out_0_out>;
+	        };
+	    };
 	};
     };
 
@@ -520,6 +550,7 @@
             port@1 {
                 reg = <1>;
                 rxwrapper_out_vid2: rxwrapper_out_vid1 {
+		    sink = <0>;
                     data-lanes = <1 2 3 4>;
                     remote-endpoint = <&vid2_in>;
                 };
@@ -527,6 +558,7 @@
             port@2 {
                 reg = <2>;
                 rxwrapper_out_isp: rxwrapper_out_isp {
+		    sink = <0>;
                     data-lanes = <1 2 3 4>;
                     remote-endpoint = <&isp_in_rxwrapper>;
                 };
