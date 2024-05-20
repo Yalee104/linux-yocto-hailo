@@ -66,6 +66,7 @@
         #sound-dai-cells = <0>;
         compatible = "ti,tlv320aic3104";
         reg = <0x18>;
+	reset-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
         ai3x-source-clk = "bclk";
         ai3x-micbias-vg = <2>;
 		/* Regulators */
@@ -318,18 +319,6 @@
         "TCK_RTSn_SoC",
         "TDIO_DTRn_SoC",
         "NC";
-
-    audio_rst_n {
-
-        gpio-hog;
-
-        gpios = <2 GPIO_ACTIVE_HIGH>;
-
-        output-high;
-
-        line-name = "gpio_18";
-
-    };
 
     eth_rst_n {
 
