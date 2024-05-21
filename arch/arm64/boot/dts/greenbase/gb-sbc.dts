@@ -5,7 +5,6 @@
 
 /dts-v1/;
 #include "../hailo/hailo15-base.dtsi"
-#include "../hailo/hailo15-camera-sensor.h"
 #include <dt-bindings/gpio/gpio.h>
 
 / {
