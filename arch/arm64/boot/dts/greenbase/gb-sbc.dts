@@ -319,6 +319,18 @@
         "TDIO_DTRn_SoC",
         "NC";
 
+    audio_rst_n {
+
+        gpio-hog;
+
+        gpios = <2 GPIO_ACTIVE_HIGH>;
+
+        output-high;
+
+        line-name = "gpio_18";
+
+    };
+
     eth_rst_n {
 
         gpio-hog;
