@@ -6,6 +6,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 #include <linux/kthread.h>
+#include <linux/pm_runtime.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-fh.h>
@@ -16,7 +17,7 @@
 
 #define HAILO_VID_NAME "hailo_video"
 
-#define MIN_BUFFERS_NEEDED 5
+#define MIN_BUFFERS_NEEDED 2
 #define MAX_NUM_FRAMES HAILO15_MAX_BUFFERS
 #define NUM_PLANES                                                             \
 	1 /*working on packed mode, this should be determined from the format*/
@@ -263,10 +264,9 @@ static int hailo15_s_fmt_vid_cap(struct file *file, void *priv,
 static void hailo15_video_node_queue_clean(struct hailo15_video_node *vid_node,
 					   enum vb2_buffer_state state)
 {
-	unsigned long flags;
 	struct hailo15_buffer *buf, *nbuf;
 
-	spin_lock_irqsave(&vid_node->qlock, flags);
+	mutex_lock(&vid_node->qlock);
 	list_for_each_entry_safe (buf, nbuf, &vid_node->buf_queue, irqlist) {
 		list_del(&buf->irqlist);
 		vb2_buffer_done(&buf->vb.vb2_buf, state);
@@ -276,7 +276,7 @@ static void hailo15_video_node_queue_clean(struct hailo15_video_node *vid_node,
 		vid_node->prev_buf = NULL;
 	}
 	vid_node->skip_first_list_entry = false;
-	spin_unlock_irqrestore(&vid_node->qlock, flags);
+	mutex_unlock(&vid_node->qlock);
 }
 
 static int hailo15_pad_s_stream(struct hailo15_video_node *vid_node, int enable)
@@ -1029,7 +1029,6 @@ static void hailo15_buffer_queue(struct vb2_buffer *vb)
 		container_of(vb, struct vb2_v4l2_buffer, vb2_buf);
 	struct hailo15_buffer *buf =
 		container_of(vbuf, struct hailo15_buffer, vb);
-	unsigned long flags;
 
 	if (WARN_ON(!vb) || WARN_ON(!vb->vb2_queue)) {
 		pr_err("%s - WARN_ON(!vb) || WARN_ON(!vb->vb2_queue), returning\n",
@@ -1043,25 +1042,25 @@ static void hailo15_buffer_queue(struct vb2_buffer *vb)
 		return;
 	}
 
-	spin_lock_irqsave(&vid_node->qlock, flags);
+	mutex_lock(&vid_node->qlock);
 	if (list_empty(&vid_node->buf_queue)) {
 		if (vid_node->path == VID_GRP_P2A)
 			vid_node->skip_first_list_entry = true;
+
 		if (hailo15_video_device_process_vb2_buffer(vb)) {
-			spin_unlock_irqrestore(&vid_node->qlock, flags);
+			mutex_unlock(&vid_node->qlock);
 			vid_node->skip_first_list_entry = false;
 			return;
 		}
 	}
 	list_add_tail(&buf->irqlist, &vid_node->buf_queue);
-	spin_unlock_irqrestore(&vid_node->qlock, flags);
+	mutex_unlock(&vid_node->qlock);
 }
 static int hailo15_video_device_buffer_done(struct hailo15_dma_ctx *ctx,
 						struct hailo15_buffer *buf,
 						int grp_id)
 {
 	struct hailo15_video_node *vid_node;
-	unsigned long flags;
 	struct hailo15_buffer *next_buffer;
 	int ret;
 
@@ -1092,12 +1091,12 @@ static int hailo15_video_device_buffer_done(struct hailo15_dma_ctx *ctx,
 	}
 
 	if (buf) {
-		spin_lock_irqsave(&vid_node->qlock, flags);
+		mutex_lock(&vid_node->qlock);
 		list_del(&buf->irqlist);
-		spin_unlock_irqrestore(&vid_node->qlock, flags);
+		mutex_unlock(&vid_node->qlock);
 	}
 
-	spin_lock_irqsave(&vid_node->qlock, flags);
+	mutex_lock(&vid_node->qlock);
 	next_buffer = list_first_entry_or_null(
 		&vid_node->buf_queue, struct hailo15_buffer, irqlist);
 	if (vid_node->skip_first_list_entry) {
@@ -1107,7 +1106,7 @@ static int hailo15_video_device_buffer_done(struct hailo15_dma_ctx *ctx,
 			next_buffer = NULL;
 		}
 	}
-	spin_unlock_irqrestore(&vid_node->qlock, flags);
+	mutex_unlock(&vid_node->qlock);
 
 	if (next_buffer) {
 		/* This might cost us some calculations.       */
@@ -1279,7 +1278,7 @@ static int hailo15_video_node_queue_init(struct hailo15_video_node *vid_node)
 {
 	int ret;
 
-	spin_lock_init(&vid_node->qlock);
+	mutex_init(&vid_node->qlock);
 	INIT_LIST_HEAD(&vid_node->buf_queue);
 	mutex_init(&vid_node->buffer_mutex);
 
@@ -1379,7 +1378,7 @@ hailo15_video_node_video_device_register(struct hailo15_video_node *vid_node)
 	if (WARN_ON(!vid_node))
 		return -EINVAL;
 	return video_register_device(vid_node->video_dev, VFL_TYPE_VIDEO,
-					 vid_node->id);
+					 vid_node->path);
 }
 
 static int
@@ -1657,6 +1656,10 @@ static int hailo15_video_probe(struct platform_device *pdev)
 
 	mutex_init(&sd_mutex);
 
+	pm_runtime_get_sync(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
     dev_info(&pdev->dev, "Video device probe finished successfully");
 	goto out;
 err_init_nodes:
@@ -1668,6 +1671,10 @@ out:
 static int hailo15_video_remove(struct platform_device *pdev)
 {
 	struct hailo15_vid_cap_device *vid_dev;
+
+	pm_runtime_put_sync(&pdev->dev);
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 
 	mutex_destroy(&sd_mutex);
 	vid_dev = platform_get_drvdata(pdev);

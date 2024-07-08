@@ -884,6 +884,7 @@ static int hailo15_rxwrapper_set_pad_format(struct v4l2_subdev *sd,
 		v4l2_subdev_to_hailo15_rxwrapper(sd);
 	const struct v4l2_mbus_framefmt *src_format = &fmt->format;
 	struct v4l2_mbus_framefmt *dst_format;
+	struct v4l2_subdev_format sensor_fmt = {0};
 	int pipe;
 	int ret;
 
@@ -900,6 +901,9 @@ static int hailo15_rxwrapper_set_pad_format(struct v4l2_subdev *sd,
 	case MEDIA_BUS_FMT_SRGGB12_1X12:
 		hailo15_rxwrapper->num_exposures = 1;
 		break;	
+	case MEDIA_BUS_FMT_SRGGB12_2X12:
+		hailo15_rxwrapper->num_exposures = 2;
+		break;
 	case MEDIA_BUS_FMT_SRGGB12_3X12:
 		hailo15_rxwrapper->num_exposures = 3;
 		break;
@@ -918,6 +922,8 @@ static int hailo15_rxwrapper_set_pad_format(struct v4l2_subdev *sd,
 		if (ret)
 			return ret;
 	}
+
+	memcpy(&sensor_fmt, fmt, sizeof(struct v4l2_subdev_format));
 
 	/* Propagate format to sink */
 	pad = &hailo15_rxwrapper->pads[RXWRAPPER_PAD_SINK0];
@@ -939,7 +945,7 @@ static int hailo15_rxwrapper_set_pad_format(struct v4l2_subdev *sd,
 			pr_warn("%s - failed to get sensor subdev\n", __func__);
 			return -EINVAL;
 		}
-		ret = v4l2_subdev_call(sensor_sd, pad, set_fmt, NULL, fmt);
+		ret = v4l2_subdev_call(sensor_sd, pad, set_fmt, NULL, &sensor_fmt);
 	}
 	return ret;
 }
@@ -1266,6 +1272,18 @@ static void hailo15_rxwrapper_clean_dma_ctx(struct hailo15_dma_ctx *ctx)
 	kfree(ctx->buf_ctx[VID_GRP_P2A].ops);
 }
 
+static uint32_t _hailo15_rxwrapper_get_expected_bits(int num, bool is_first_frame_hdr) {
+	uint32_t mask;
+	if (num < 0 || num > 31) {
+        return 0;
+    }
+	mask = (1 << num) - 1;
+	if (is_first_frame_hdr) {
+		return mask & (mask - 1);
+	}   
+    return mask;
+}
+
 static irqreturn_t hailo15_rxwrapper_irq_handler(int irq, void *arg)
 {
 	struct hailo15_rxwrapper_priv *hailo15_rxwrapper =
@@ -1273,8 +1291,8 @@ static irqreturn_t hailo15_rxwrapper_irq_handler(int irq, void *arg)
 
 	int pipe;
 	uint32_t val;
-	const uint32_t hdr_expected_val = 0x7;
-	const uint32_t first_frame_hdr_expected_val = 0x6;
+	const uint32_t expected_val = _hailo15_rxwrapper_get_expected_bits(hailo15_rxwrapper->num_exposures, false);
+	const uint32_t first_frame_hdr_expected_val = _hailo15_rxwrapper_get_expected_bits(hailo15_rxwrapper->num_exposures, true);
 	bool is_first_frame_hdr = false;
 	uint32_t status_credit_handler_frame_cnt[RXWRAPPER_MAX_NUM_EXPOSURES];
 
@@ -1287,23 +1305,16 @@ static irqreturn_t hailo15_rxwrapper_irq_handler(int irq, void *arg)
 			RXWRAPPER_PIPES_STATUS_CREDIT_HANDLER_FRAME_CNT_WIDTH);
 	}
 
-	if (hailo15_rxwrapper->num_exposures > 1) {
-		/* hdr mode */
-		is_first_frame_hdr = status_credit_handler_frame_cnt[0] == 0;
-		if (is_first_frame_hdr && val == first_frame_hdr_expected_val) {
-			hailo15_rxwrapper_buffer_done(hailo15_rxwrapper, true);
-			writel(val, hailo15_rxwrapper->p2a_buf_regs.buffer_ready_ap_int_w1c_addr);
-		} else if (val == hdr_expected_val) {
-			hailo15_rxwrapper_buffer_done(hailo15_rxwrapper, false);
-			writel(val, hailo15_rxwrapper->p2a_buf_regs.buffer_ready_ap_int_w1c_addr);
-		}
-		return IRQ_HANDLED;
-	} else {
-		/* sdr mode */
+	/* TODO MSW-4889: fix bug in LEF first frame. */
+	is_first_frame_hdr = status_credit_handler_frame_cnt[0] == 0 && hailo15_rxwrapper->num_exposures > 1;
+	if (is_first_frame_hdr && val == first_frame_hdr_expected_val) {
+		hailo15_rxwrapper_buffer_done(hailo15_rxwrapper, true);
+		writel(val, hailo15_rxwrapper->p2a_buf_regs.buffer_ready_ap_int_w1c_addr);
+	} else if (val == expected_val) {
 		hailo15_rxwrapper_buffer_done(hailo15_rxwrapper, false);
 		writel(val, hailo15_rxwrapper->p2a_buf_regs.buffer_ready_ap_int_w1c_addr);
-		return IRQ_HANDLED;
 	}
+	return IRQ_HANDLED;
 }
 
 static struct hailo15_buf_ops hailo15_rxwrapper_buf_ops = {
@@ -1368,6 +1379,10 @@ int hailo15_rxwrapper_probe(struct platform_device *pdev)
 			   __func__);
 		return PTR_ERR(hailo15_rxwrapper->rxwrapper0_data_clk);
 	}
+
+	pm_runtime_get_sync(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
 
 	ret = clk_prepare_enable(hailo15_rxwrapper->rxwrapper0_p_clk);
 	if (ret) {
@@ -1492,6 +1507,11 @@ int hailo15_rxwrapper_remove(struct platform_device *pdev)
 	mutex_destroy(&hailo15_rxwrapper->lock);
 	hailo15_media_entity_clean(&hailo15_rxwrapper->sd.entity);
 	v4l2_device_unregister_subdev(&hailo15_rxwrapper->sd);
+
+	pm_runtime_put_sync(&pdev->dev);
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
+
 	kfree(hailo15_rxwrapper);
 	hailo15_rxwrapper_clean_dma_ctx(ctx);
 	kfree(ctx);

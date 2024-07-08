@@ -611,7 +611,8 @@ long xrp_share_kernel(
 long xrp_share_block(
     struct file *filp, void *virt, unsigned long size,
     enum ioctl_buffer_flags flags, phys_addr_t *paddr, uint32_t *dsp_paddr,
-    struct xrp_mapping *mapping, enum lut_mapping lut_mapping, bool config_lut)
+    struct xrp_mapping *mapping, enum lut_mapping lut_mapping, bool config_lut,
+    bool force_cache)
 {
     uintptr_t vaddr = (uintptr_t)virt;
     phys_addr_t phys = ~0ul;
@@ -670,7 +671,7 @@ long xrp_share_block(
         mapping->native.xrp_allocation = xrp_allocation;
         mapping->native.vaddr = vaddr;
         xrp_allocation_get(xrp_allocation);
-        do_cache = !user_sync_buffer && vma_needs_cache_ops(vma);
+        do_cache = (force_cache) || (!user_sync_buffer && vma_needs_cache_ops(vma));
         rc = 0;
     }
     if (rc < 0) {

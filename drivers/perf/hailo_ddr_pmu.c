@@ -39,6 +39,9 @@
 		.sample_time_us = DEFAULT_SAMPLE_TIME_US, \
 		.after_trigger_percentage = 50, \
 		.is_freerunning = false, \
+		.csm_enabled = true, \
+		.dsm_rx_enabled = true, \
+		.dsm_tx_enabled = true, \
 		.num_counters = NUMBER_OF_COUNTERS, \
 		.filters = { \
 			/* Filter 1 */ \
@@ -65,21 +68,24 @@ struct indexed_device_attribute {
 	int index;
 };
 
-#define __INDEXED_ATTR_RW_MODE(_name, _mode, _index) {				\
+#define __INDEXED_ATTR_RW_MODE(_name, _category, _mode, _index) {				\
 	.device_attribute = { 							\
 		.attr	= { .name = __stringify(_name),				\
 				.mode = VERIFY_OCTAL_PERMISSIONS(_mode) },	\
-		.show	= _name##_show,						\
-		.store	= _name##_store,					\
+		.show	= _name##_##_category##_show,						\
+		.store	= _name##_##_category##_store,					\
 	}, 									\
 	.index	= _index,							\
 }
 
-#define INDEXED_DEVICE_ATTR_ADMIN_RW(_name, _index) \
-	struct indexed_device_attribute dev_attr_##_name##_index = __INDEXED_ATTR_RW_MODE(_name, 0600, _index)
+#define INDEXED_DEVICE_ATTR_ADMIN_RW(_name, _category, _index) \
+	struct indexed_device_attribute dev_attr_##_name##_##_category##_index = __INDEXED_ATTR_RW_MODE(_name, _category, 0600, _index)
 
 struct ddr_sample {
-	uint32_t counters[4];
+	uint32_t noc_counters[4];
+	uint32_t dsm_rx_counter;
+	uint32_t dsm_tx_counter;
+	uint32_t csm_counter;
 	uint64_t timestamp;
 	bool triggered;
 } __packed;
@@ -485,14 +491,14 @@ static struct scmi_hailo_ddr_start_measure_a2p_filter *get_filter(struct device 
 	return &pmu->params.filters[get_attribute_index(attr)];
 }
 
-#define COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(_name) \
-	static INDEXED_DEVICE_ATTR_ADMIN_RW(_name, 0); \
-	static INDEXED_DEVICE_ATTR_ADMIN_RW(_name, 1); \
-	static INDEXED_DEVICE_ATTR_ADMIN_RW(_name, 2); \
-	static INDEXED_DEVICE_ATTR_ADMIN_RW(_name, 3);
+#define NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(_name) \
+	static INDEXED_DEVICE_ATTR_ADMIN_RW(_name, noc, 0); \
+	static INDEXED_DEVICE_ATTR_ADMIN_RW(_name, noc, 1); \
+	static INDEXED_DEVICE_ATTR_ADMIN_RW(_name, noc, 2); \
+	static INDEXED_DEVICE_ATTR_ADMIN_RW(_name, noc, 3);
 
 /* show attribute */
-static ssize_t enabled_show(struct device *dev,
+static ssize_t enabled_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct hailo_pmu *pmu = dev_get_drvdata(dev);
@@ -500,7 +506,7 @@ static ssize_t enabled_show(struct device *dev,
 
 	return sprintf(buf, "%d\n", pmu->active_counters[index]);
 }
-static ssize_t enabled_store(struct device *dev,
+static ssize_t enabled_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
@@ -515,7 +521,7 @@ static ssize_t enabled_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(enabled);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(enabled);
 
 static int hailo_pmu_event_init(struct perf_event *event)
 {
@@ -554,7 +560,7 @@ static int hailo_pmu_event_init(struct perf_event *event)
 }
 
 /* mode attribute */
-static ssize_t mode_show(struct device *dev,
+static ssize_t mode_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
@@ -563,7 +569,7 @@ static ssize_t mode_show(struct device *dev,
 		return sprintf(buf, "total\n");
 	return sprintf(buf, "filter\n");
 }
-static ssize_t mode_store(struct device *dev,
+static ssize_t mode_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
@@ -581,17 +587,17 @@ static ssize_t mode_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(mode);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(mode);
 
 /* route_id_base attribute */
-static ssize_t route_id_base_show(struct device *dev,
+static ssize_t route_id_base_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%08x\n", filter->routeidbase);
 }
-static ssize_t route_id_base_store(struct device *dev,
+static ssize_t route_id_base_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
@@ -605,17 +611,17 @@ static ssize_t route_id_base_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(route_id_base);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(route_id_base);
 
 /* route_id_mask attribute */
-static ssize_t route_id_mask_show(struct device *dev,
+static ssize_t route_id_mask_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%08x\n", filter->routeidmask);
 }
-static ssize_t route_id_mask_store(struct device *dev,
+static ssize_t route_id_mask_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
@@ -629,19 +635,19 @@ static ssize_t route_id_mask_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(route_id_mask);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(route_id_mask);
 
 /* opcode attribute */
-static ssize_t opcode_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t opcode_noc_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%02x\n", filter->opcode);
 }
-static ssize_t opcode_store(struct device *dev,
-				 struct device_attribute *attr,
-				 const char *buf, size_t count)
+static ssize_t opcode_noc_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u8 val;
@@ -656,19 +662,19 @@ static ssize_t opcode_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(opcode);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(opcode);
 
 /* length attribute */
-static ssize_t length_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t length_noc_show(struct device *dev,
+			   struct device_attribute *attr, char *buf)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%02x\n", filter->length);
 }
-static ssize_t length_store(struct device *dev,
-				 struct device_attribute *attr,
-				 const char *buf, size_t count)
+static ssize_t length_noc_store(struct device *dev,
+				struct device_attribute *attr,
+				const char *buf, size_t count)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u8 val;
@@ -683,11 +689,11 @@ static ssize_t length_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(length);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(length);
 
 /* address_base attribute */
-static ssize_t address_base_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
+static ssize_t address_base_noc_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u64 address_base = filter->addrbase_low +
@@ -695,9 +701,9 @@ static ssize_t address_base_show(struct device *dev,
 
 	return sprintf(buf, "0x%016llx\n", address_base);
 }
-static ssize_t address_base_store(struct device *dev,
-				 struct device_attribute *attr,
-				 const char *buf, size_t count)
+static ssize_t address_base_noc_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u64 address_base;
@@ -712,16 +718,16 @@ static ssize_t address_base_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(address_base);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(address_base);
 
-static ssize_t window_size_show(struct device *dev,
+static ssize_t window_size_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%02x\n", filter->window_size);
 }
-static ssize_t window_size_store(struct device *dev,
+static ssize_t window_size_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
@@ -738,16 +744,16 @@ static ssize_t window_size_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(window_size);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(window_size);
 
-static ssize_t urgency_show(struct device *dev,
+static ssize_t urgency_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
 	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "%x\n", filter->urgency);
 }
-static ssize_t urgency_store(struct device *dev,
+static ssize_t urgency_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
@@ -764,40 +770,150 @@ static ssize_t urgency_store(struct device *dev,
 
 	return count;
 }
-COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(urgency);
+NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(urgency);
 
-#define COUNTER_ATTR_GROUP(_index) \
-	struct attribute *hailo_pmu_counter##_index##_attrs[] = { \
-		&dev_attr_enabled##_index.device_attribute.attr, \
-		&dev_attr_mode##_index.device_attribute.attr, \
-		&dev_attr_route_id_base##_index.device_attribute.attr, \
-		&dev_attr_route_id_mask##_index.device_attribute.attr, \
-		&dev_attr_opcode##_index.device_attribute.attr, \
-		&dev_attr_length##_index.device_attribute.attr, \
-		&dev_attr_address_base##_index.device_attribute.attr, \
-		&dev_attr_window_size##_index.device_attribute.attr, \
-		&dev_attr_urgency##_index.device_attribute.attr, \
+#define NOC_COUNTER_ATTR_GROUP(_index) \
+	struct attribute *hailo_pmu_noc_counter##_index##_attrs[] = { \
+		&dev_attr_enabled_noc##_index.device_attribute.attr, \
+		&dev_attr_mode_noc##_index.device_attribute.attr, \
+		&dev_attr_route_id_base_noc##_index.device_attribute.attr, \
+		&dev_attr_route_id_mask_noc##_index.device_attribute.attr, \
+		&dev_attr_opcode_noc##_index.device_attribute.attr, \
+		&dev_attr_length_noc##_index.device_attribute.attr, \
+		&dev_attr_address_base_noc##_index.device_attribute.attr, \
+		&dev_attr_window_size_noc##_index.device_attribute.attr, \
+		&dev_attr_urgency_noc##_index.device_attribute.attr, \
 		NULL, \
 	}; \
-	static const struct attribute_group hailo_pmu_counter##_index##_attr_group = { \
+	static const struct attribute_group hailo_pmu_noc_counter##_index##_attr_group = { \
 		.name = "counter"#_index, \
-		.attrs = hailo_pmu_counter##_index##_attrs, \
+		.attrs = hailo_pmu_noc_counter##_index##_attrs, \
 	};
 
-static COUNTER_ATTR_GROUP(0);
-static COUNTER_ATTR_GROUP(1);
-static COUNTER_ATTR_GROUP(2);
-static COUNTER_ATTR_GROUP(3);
+static NOC_COUNTER_ATTR_GROUP(0);
+static NOC_COUNTER_ATTR_GROUP(1);
+static NOC_COUNTER_ATTR_GROUP(2);
+static NOC_COUNTER_ATTR_GROUP(3);
+
+/* CSM enabled */
+static ssize_t csm_enabled_show(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct hailo_pmu *pmu = dev_get_drvdata(dev);
+	int value = pmu->params.csm_enabled;
+
+	return sprintf(buf, "%d\n", value);
+}
+static ssize_t csm_enabled_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct hailo_pmu *pmu = dev_get_drvdata(dev);
+	bool val;
+
+	if (kstrtobool(buf, &val))
+		return -EINVAL;
+
+	pmu->params.csm_enabled = val;
+
+	return count;
+}
+struct device_attribute dev_attr_csm_enabled =
+	__ATTR(enabled, 0600, csm_enabled_show, csm_enabled_store);
+struct attribute *hailo_pmu_csm_counter_attrs[] = {
+	&dev_attr_csm_enabled.attr,
+	NULL,
+};
+static const struct attribute_group hailo_pmu_csm_counter_attr_group = {
+	.name = "csm",
+	.attrs = hailo_pmu_csm_counter_attrs,
+};
+
+
+/* DSM RX enabled*/
+static ssize_t dsm_rx_enabled_show(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct hailo_pmu *pmu = dev_get_drvdata(dev);
+	int value = pmu->params.dsm_rx_enabled;
+
+	return sprintf(buf, "%d\n", value);
+}
+static ssize_t dsm_rx_enabled_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct hailo_pmu *pmu = dev_get_drvdata(dev);
+	bool val;
+
+	if (kstrtobool(buf, &val))
+		return -EINVAL;
+
+	pmu->params.dsm_rx_enabled = val;
+
+	return count;
+}
+struct device_attribute dev_attr_dsm_rx_enabled =
+	__ATTR(enabled, 0600, dsm_rx_enabled_show, dsm_rx_enabled_store);
+struct attribute *hailo_pmu_dsm_rx_counter_attrs[] = {
+	&dev_attr_dsm_rx_enabled.attr,
+	NULL,
+};
+static const struct attribute_group hailo_pmu_dsm_rx_counter_attr_group = {
+	.name = "dsm_rx",
+	.attrs = hailo_pmu_dsm_rx_counter_attrs,
+};
+
+
+/* DSM TX enabled */
+static ssize_t dsm_tx_enabled_show(struct device *dev,
+				    struct device_attribute *attr,
+				    char *buf)
+{
+	struct hailo_pmu *pmu = dev_get_drvdata(dev);
+	int value = pmu->params.dsm_tx_enabled;
+
+	return sprintf(buf, "%d\n", value);
+}
+static ssize_t dsm_tx_enabled_store(struct device *dev,
+				     struct device_attribute *attr,
+				     const char *buf, size_t count)
+{
+	struct hailo_pmu *pmu = dev_get_drvdata(dev);
+	bool val;
+
+	if (kstrtobool(buf, &val))
+		return -EINVAL;
+
+	pmu->params.dsm_tx_enabled = val;
+
+	return count;
+}
+struct device_attribute dev_attr_dsm_tx_enabled =
+	__ATTR(enabled, 0600, dsm_tx_enabled_show, dsm_tx_enabled_store);
+struct attribute *hailo_pmu_dsm_tx_counter_attrs[] = {
+	&dev_attr_dsm_tx_enabled.attr,
+	NULL,
+};
+static const struct attribute_group hailo_pmu_dsm_tx_counter_attr_group = {
+	.name = "dsm_tx",
+	.attrs = hailo_pmu_dsm_tx_counter_attrs,
+};
 
 /* All attributes */
 
 static const struct attribute_group *hailo_pmu_attr_groups[] = {
 	&hailo_pmu_events_attr_group,
 	&hailo_pmu_format_attr_group,
-	&hailo_pmu_counter0_attr_group,
-	&hailo_pmu_counter1_attr_group,
-	&hailo_pmu_counter2_attr_group,
-	&hailo_pmu_counter3_attr_group,
+	&hailo_pmu_noc_counter0_attr_group,
+	&hailo_pmu_noc_counter1_attr_group,
+	&hailo_pmu_noc_counter2_attr_group,
+	&hailo_pmu_noc_counter3_attr_group,
+	&hailo_pmu_csm_counter_attr_group,
+	&hailo_pmu_dsm_rx_counter_attr_group,
+	&hailo_pmu_dsm_tx_counter_attr_group,
 	NULL,
 };
 
@@ -937,6 +1053,7 @@ static int hailo_pmu_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, hailo_pmu);
 
+	/* Set default config */
 	hailo_pmu->params = DEFAULT_PARAMS;
 	hailo_pmu->active_counters[0] = true;
 
@@ -999,13 +1116,13 @@ static const struct of_device_id hailo_ddr_pmu_dt_ids[] = {
 MODULE_DEVICE_TABLE(of, hailo_ddr_pmu_dt_ids);
 
 static struct platform_driver hailo_ddr_pmu_driver = {
-	.driver         = {
+	.driver = {
 		.name   = "hailo-ddr-pmu",
 		.of_match_table = hailo_ddr_pmu_dt_ids,
 		.suppress_bind_attrs = true,
 	},
-	.probe          = hailo_pmu_probe,
-	.remove         = hailo_pmu_remove,
+	.probe  = hailo_pmu_probe,
+	.remove = hailo_pmu_remove,
 };
 
 module_platform_driver(hailo_ddr_pmu_driver);

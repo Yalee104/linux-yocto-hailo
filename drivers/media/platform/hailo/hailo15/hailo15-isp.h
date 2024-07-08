@@ -102,6 +102,11 @@ struct hailo15_isp_pad_data {
 	struct hailo15_pad_stat_subscribe stat_sub[HAILO15_UEVENT_ISP_STAT_MAX];
 };
 
+struct hailo15_miv2_mis {
+	uint32_t miv2_mis;
+	struct list_head list;
+};
+
 struct hailo15_isp_device {
 	struct device *dev;
 	struct v4l2_subdev sd;
@@ -159,6 +164,11 @@ struct hailo15_isp_device {
 	int frame_end;
 	int fe_ready;
 	int fe_enable;
+	struct tasklet_struct fe_tasklet;
+	struct list_head miv2_mis_queue;
+	spinlock_t miv2_mis_lock;
+	struct workqueue_struct* miv2_mis_wq;
+	struct work_struct miv2_mis_w;
 };
 
 
@@ -186,4 +196,6 @@ int hailo15_isp_g_ctrl_event(struct hailo15_isp_device *isp_dev, int pad,
 irqreturn_t isp_irq_process(struct hailo15_isp_device *isp_dev);
 irqreturn_t hailo15_process_irq_stats_events(struct hailo15_isp_device *isp_dev,
     int event_id, uint32_t mis);
+void mcm_fe_irq_tasklet(unsigned long);
+void hailo15_isp_handle_frame_rx(struct work_struct*);
 #endif

@@ -112,7 +112,6 @@ static inline void cmsdk_reverse_polarity(GPIO_BLOCK_regs_s *CMSDK_GPIO_REGS, in
 
 static int cmsdk_irq_set_type(struct irq_data *data, unsigned int type) {
 	struct irq_chip_generic *icg = irq_data_get_irq_chip_data(data);
-	struct irq_chip_type *ct = irq_data_get_chip_type(data);
 	struct cmsdk_gpio *gpio = icg->private;
 	GPIO_BLOCK_regs_s *CMSDK_GPIO_REGS =
 		((GPIO_BLOCK_regs_s *)gpio->base);
@@ -127,10 +126,6 @@ static int cmsdk_irq_set_type(struct irq_data *data, unsigned int type) {
 	    && type != IRQ_TYPE_LEVEL_LOW
 	    && type != IRQ_TYPE_EDGE_BOTH)
 		return -EINVAL;
-
-	if (!(ct->type & type))
-		if (irq_setup_alt_chip(data, type))
-			return -EINVAL;
 
 	/* Set INTTYPE */
 	if (type == IRQ_TYPE_EDGE_RISING || type == IRQ_TYPE_EDGE_FALLING || type == IRQ_TYPE_EDGE_BOTH)
@@ -415,7 +410,6 @@ static int cmsdk_setup_irq(struct platform_device *pdev, struct cmsdk_gpio *cmsd
 	gc = irq_get_domain_generic_chip(cmsdk_gpio->irq_domain, 0);
 	gc->private = cmsdk_gpio;
 	ct = &gc->chip_types[0];
-	ct->type = IRQCHIP_SET_TYPE_MASKED | IRQCHIP_MASK_ON_SUSPEND;
 	ct->chip.irq_ack = cmsdk_irq_ack;
 	ct->chip.irq_mask = cmsdk_irq_mask;
 	ct->chip.irq_unmask = cmsdk_irq_unmask;

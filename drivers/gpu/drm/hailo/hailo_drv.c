@@ -1,4 +1,5 @@
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_drv.h>
@@ -103,6 +104,10 @@ static int driver_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->dsi_p_clk))
 		return PTR_ERR(priv->dsi_p_clk);
 
+	pm_runtime_get_sync(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	ret = drm_simple_display_pipe_init(drm, &priv->pipe, NULL,
 					   hailo_supported_formats,
 					   ARRAY_SIZE(hailo_supported_formats),
@@ -142,6 +147,9 @@ static int driver_remove(struct platform_device *pdev)
 	struct drm_device *drm = platform_get_drvdata(pdev);
 	drm_dev_unregister(drm);
 	drm_atomic_helper_shutdown(drm);
+	pm_runtime_put_sync(&pdev->dev);
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 
 	return 0;
 }

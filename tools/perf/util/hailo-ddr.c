@@ -8,7 +8,10 @@
 #include <internal/lib.h>
 
 struct ddr_sample {
-	uint32_t counters[4];
+	uint32_t noc_counters[4];
+	uint32_t dsm_rx_counter;
+	uint32_t dsm_tx_counter;
+	uint32_t csm_counter;
 	uint64_t timestamp;
 	bool triggered;
 } __packed;
@@ -54,7 +57,7 @@ static int hailo_ddr_process_auxtrace_event(
 		return -EINVAL;
 	}
 
-	printf("index  time           counter0    counter1    counter2    counter3    note\n");
+	printf("index  time           counter0    counter1    counter2    counter3    dsm_rx      dsm_tx      csm         note\n");
 	for (i = 0; i < size / sizeof(*data); ++i) {
 		uint32_t duration_s, duration_us;
 		char time_buf[20];
@@ -63,13 +66,16 @@ static int hailo_ddr_process_auxtrace_event(
 		duration_us = (data[i].timestamp % 1000000000) / 1000;
 		snprintf(time_buf, sizeof(time_buf), "%lu.%06u", duration_s, duration_us);
 
-		printf("%-5d  %-13s  %-10lu  %-10lu  %-10lu  %-10lu  %s\n",
+		printf("%-5d  %-13s  %-10u  %-10u  %-10u  %-10u  %-10u  %-10u  %-10u  %s\n",
 			i,
 			time_buf,
-			data[i].counters[0],
-			data[i].counters[1],
-			data[i].counters[2],
-			data[i].counters[3],
+			data[i].noc_counters[0],
+			data[i].noc_counters[1],
+			data[i].noc_counters[2],
+			data[i].noc_counters[3],
+			data[i].dsm_rx_counter,
+			data[i].dsm_tx_counter,
+			data[i].csm_counter,
 			data[i].triggered ? "<< triggered" : ".");
 	}
 

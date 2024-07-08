@@ -58,9 +58,9 @@ void hailo15_config_isp_wrapper(struct hailo15_isp_device *isp_dev)
 }
 
 void hailo15_isp_reset_hw(struct hailo15_isp_device* isp_dev){
-	hailo15_isp_write_reg(isp_dev, VI_IRCL, VI_IRCL_RESET_ISP);
+	writel(VI_IRCL_RESET_ISP, isp_dev->base + VI_IRCL);
 	mdelay(10);
-	hailo15_isp_write_reg(isp_dev, VI_IRCL, VI_IRCL_RESET_ISP_CLEAR);
+	writel(VI_IRCL_RESET_ISP_CLEAR, isp_dev->base + VI_IRCL);
 }
 EXPORT_SYMBOL(hailo15_isp_reset_hw);
 
@@ -337,11 +337,9 @@ static void hailo15_isp_handle_frame_rx_rdma(struct hailo15_isp_device *isp_dev,
 	if(__hailo15_isp_frame_rx_rdma_ready(irq_status)){
 		isp_dev->dma_ready = 1;
 	}
-
 	if(__hailo15_isp_frame_rx_mp(irq_status) || __hailo15_isp_frame_rx_sp2(irq_status)){
 		isp_dev->frame_end = 1;
 	}
-	
 	if(isp_dev->frame_end && isp_dev->dma_ready &&  (!isp_dev->fe_enable || isp_dev->fe_ready)){
 		/* do rx_rdma */
 		hailo15_isp_buffer_done(isp_dev, ISP_MCM_IN);
@@ -377,12 +375,30 @@ static void hailo15_isp_handle_frame_rx_sp2(struct hailo15_isp_device *isp_dev,
 	hailo15_isp_buffer_done(isp_dev, ISP_SP2);
 }
 
-static void hailo15_isp_handle_frame_rx(struct hailo15_isp_device *isp_dev,
-					int irq_status)
+void hailo15_isp_handle_frame_rx(struct work_struct *work)
 {
-	hailo15_isp_handle_frame_rx_mp(isp_dev, irq_status);
-	hailo15_isp_handle_frame_rx_sp2(isp_dev, irq_status);
-	hailo15_isp_handle_frame_rx_rdma(isp_dev, irq_status);
+	struct hailo15_isp_device *isp_dev =
+		(struct hailo15_isp_device *)container_of(
+			work, struct hailo15_isp_device, miv2_mis_w);
+	struct hailo15_miv2_mis* miv2_mis, *miv2_pos, *miv2_npos;
+	struct list_head miv2_tmp_list;
+	unsigned long flags;
+
+	INIT_LIST_HEAD(&miv2_tmp_list);
+	spin_lock_irqsave(&isp_dev->miv2_mis_lock, flags);
+	while((miv2_mis = list_first_entry_or_null(&isp_dev->miv2_mis_queue, struct hailo15_miv2_mis, list))){
+		list_del(&miv2_mis->list);
+		list_add(&miv2_mis->list, &miv2_tmp_list);
+	}
+	spin_unlock_irqrestore(&isp_dev->miv2_mis_lock, flags);
+
+	list_for_each_entry_safe(miv2_pos, miv2_npos, &miv2_tmp_list, list){
+		hailo15_isp_handle_frame_rx_mp(isp_dev, miv2_pos->miv2_mis);
+		hailo15_isp_handle_frame_rx_sp2(isp_dev, miv2_pos->miv2_mis);
+		hailo15_isp_handle_frame_rx_rdma(isp_dev, miv2_pos->miv2_mis);
+		list_del(&miv2_pos->list);
+		kfree(miv2_pos);
+	}
 }
 
 void hailo15_isp_handle_afm_int(struct work_struct *work)
@@ -424,6 +440,9 @@ static void hailo15_isp_handle_int(struct hailo15_isp_device *isp_dev)
 	int raised_irq_count = 0;
 	int isp_imsc = 0;
 	int mi_ctrl;
+	unsigned long flags;
+	struct hailo15_miv2_mis *miv2_mis;
+	uint32_t masked_mis;
 
 	/* clear the hw interrupt*/
 	isp_dev->irq_status.isp_mis = hailo15_isp_read_reg(isp_dev, ISP_MIS);
@@ -455,11 +474,24 @@ static void hailo15_isp_handle_int(struct hailo15_isp_device *isp_dev)
 	}
 
     hailo15_process_irq_stats_events(isp_dev, HAILO15_ISP_IRQ_EVENT_ISP_MIS, isp_dev->irq_status.isp_mis);
-
 	isp_dev->irq_status.isp_miv2_mis =
 		hailo15_isp_read_reg(isp_dev, MIV2_MIS);
+
+
 	hailo15_isp_write_reg(isp_dev, MIV2_ICR,
 			      isp_dev->irq_status.isp_miv2_mis);
+	masked_mis = isp_dev->irq_status.isp_miv2_mis & (MIV2_MP_YCBCR_FRAME_END_MASK | MIV2_SP2_YCBCR_FRAME_END_MASK | MIV2_MCM_DMA_RAW_READY_MASK);
+	if (masked_mis != 0) {
+		miv2_mis = kzalloc(sizeof(struct hailo15_miv2_mis), 	GFP_ATOMIC);
+		if(miv2_mis){
+			miv2_mis->miv2_mis = masked_mis;
+			spin_lock_irqsave(&isp_dev->miv2_mis_lock, flags);
+			list_add_tail(&miv2_mis->list, &isp_dev->miv2_mis_queue);
+			spin_unlock_irqrestore(&isp_dev->miv2_mis_lock, flags);
+			queue_work(isp_dev->miv2_mis_wq, &isp_dev->miv2_mis_w);
+		}
+		raised_irq_count++;
+	}
 
 	if (isp_dev->irq_status.isp_miv2_mis & MIV2_SP2_RAW_FRAME_END) {
 		mi_ctrl = hailo15_isp_read_reg(isp_dev, MI_CTRL);
@@ -468,11 +500,6 @@ static void hailo15_isp_handle_int(struct hailo15_isp_device *isp_dev)
 		isp_dev->irq_status.isp_miv2_mis &= ~MIV2_SP2_RAW_FRAME_END;
 	}
 
-	if (isp_dev->irq_status.isp_miv2_mis != 0) {
-		hailo15_isp_handle_frame_rx(isp_dev,
-					    isp_dev->irq_status.isp_miv2_mis);
-		raised_irq_count++;
-	}
 	
 	hailo15_process_irq_stats_events(isp_dev, HAILO15_ISP_IRQ_EVENT_MI_MIS, isp_dev->irq_status.isp_miv2_mis);
  	
@@ -495,8 +522,9 @@ static void hailo15_isp_handle_int(struct hailo15_isp_device *isp_dev)
 		if(isp_dev->irq_status.isp_fe != 0)
 			raised_irq_count++;
 
-		if(isp_dev->fe_dev)
+		if(isp_dev->fe_dev){
 			isp_dev->fe_dev->fe_dma_irq(isp_dev->fe_dev);
+		}
 
 		if(isp_dev->irq_status.isp_fe & 1){
 			isp_dev->fe_ready = 1;
@@ -524,9 +552,10 @@ static void hailo15_isp_handle_int(struct hailo15_isp_device *isp_dev)
 	}
 
 	if(isp_dev->fe_enable && isp_dev->irq_status.isp_mis & ISP_MIS_FRAME_OUT){
-		/* @TODO move to tasklet */
-		isp_dev->fe_dev->fe_isp_irq_work(isp_dev->fe_dev);
+		tasklet_schedule(&isp_dev->fe_tasklet);
 	}
+
+
 }
 
 irqreturn_t hailo15_isp_irq_process(struct hailo15_isp_device *isp_dev)
@@ -534,5 +563,13 @@ irqreturn_t hailo15_isp_irq_process(struct hailo15_isp_device *isp_dev)
 	hailo15_isp_handle_int(isp_dev);
 	return IRQ_HANDLED;
 }
+
+
+void mcm_fe_irq_tasklet(unsigned long arg){
+	struct hailo15_isp_device *isp_dev = (struct hailo15_isp_device*)arg;
+	isp_dev->fe_dev->fe_isp_irq_work(isp_dev->fe_dev);
+}
+EXPORT_SYMBOL(mcm_fe_irq_tasklet);
+
 
 MODULE_LICENSE("GPL v2");

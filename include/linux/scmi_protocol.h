@@ -559,6 +559,7 @@ struct scmi_hailo_proto_ops {
 	int (*set_eth_rmii)(const struct scmi_protocol_handle *ph);
 	int (*start_measure)(const struct scmi_protocol_handle *ph, struct scmi_hailo_ddr_start_measure_a2p *params);
 	int (*stop_measure)(const struct scmi_protocol_handle *ph, struct scmi_hailo_ddr_stop_measure_p2a *output);
+	int (*send_boot_success_ind)(const struct scmi_protocol_handle *ph, struct scmi_hailo_boot_success_indication_a2p *params);
 };
 
 #endif /* IS_ENABLED(CONFIG_HAILO_SCMI_PROTOCOL) */

@@ -100,7 +100,8 @@ long xrp_share_dma(
 long xrp_share_block(
     struct file *filp, void *virt, unsigned long size,
     enum ioctl_buffer_flags flags, phys_addr_t *paddr, uint32_t *dsp_paddr,
-    struct xrp_mapping *mapping, enum lut_mapping lut_mapping, bool config_lut);
+    struct xrp_mapping *mapping, enum lut_mapping lut_mapping, bool config_lut, 
+    bool force_cache);
 
 long xrp_unshare(
     struct xvp *xvp, struct xrp_mapping *mapping,

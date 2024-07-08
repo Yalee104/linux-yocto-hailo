@@ -79,7 +79,7 @@ struct xrp_request {
     } while(0)
 
 static long xrp_unmap_request(struct xvp *xvp, struct xrp_request *rq,
-    bool writeback, kernel_perf_stats_t *kernel_perf_stats)
+    bool writeback)
 {
     size_t n_buffers = rq->n_buffers;
     size_t i;
@@ -107,14 +107,6 @@ static long xrp_unmap_request(struct xvp *xvp, struct xrp_request *rq,
         if (copy_to_user((void __user *)(unsigned long)rq->ioctl_queue.out_data_addr,
                  rq->out_data, rq->ioctl_queue.out_data_size)) {
             dev_err(xvp->dev, "%s: out_data could not be copied\n", __func__);
-            ret = -EFAULT;
-        }
-    }
-
-    if ((rq->ioctl_queue.perf_stats_enabled) && (kernel_perf_stats)){
-        if (copy_to_user((void __user *)(unsigned long)rq->ioctl_queue.kernel_perf_stats_addr,
-                         kernel_perf_stats, sizeof(*kernel_perf_stats))) {
-            dev_err(xvp->dev, "%s: kernel perf stats could not be copied\n", __func__);
             ret = -EFAULT;
         }
     }
@@ -194,7 +186,7 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
         ret = xrp_share_block(filp, (void *)rq->ioctl_queue.in_data_addr,
                 rq->ioctl_queue.in_data_size, XRP_FLAG_READ, &rq->in_data_phys,
                 &rq->dsp_in_data_phys, &rq->in_data_mapping,
-                LUT_MAPPING_IN_DATA, true);
+                LUT_MAPPING_IN_DATA, true, true);
         if(ret < 0) {
             dev_err(xvp->dev, "%s: in_data could not be shared\n",
                  __func__);
@@ -217,7 +209,7 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
         ret = xrp_share_block(filp, (void *)rq->ioctl_queue.out_data_addr,
                 rq->ioctl_queue.out_data_size, XRP_FLAG_WRITE, 
                 &rq->out_data_phys, &rq->dsp_out_data_phys,
-                &rq->out_data_mapping, LUT_MAPPING_OUT_DATA, true);
+                &rq->out_data_mapping, LUT_MAPPING_OUT_DATA, true, true);
         if (ret < 0) {
             dev_err(xvp->dev, "%s: out_data could not be shared\n",
                  __func__);
@@ -244,7 +236,7 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
                 dev_dbg(xvp->dev, "%s: sharing buffer %zd (virtual address) \n", __func__, i);
 		        ret = xrp_share_block(filp, (void *)ioctl_buffer.addr,
 					    ioctl_buffer.size, ioctl_buffer.flags, &buffer_phys, NULL,
-					    rq->buffers_mapping + i, NO_LUT_MAPPING, true);
+					    rq->buffers_mapping + i, NO_LUT_MAPPING, true, false);
             } else {
                 dev_dbg(xvp->dev, "%s: sharing buffer %zd (dmabuf) \n", __func__, i);
                 ret = xrp_share_dmabuf(filp, ioctl_buffer.fd, ioctl_buffer.size, ioctl_buffer.flags, &buffer_phys,
@@ -295,7 +287,7 @@ static long xrp_map_request(struct file *filp, struct xrp_request *rq,
 share_err:
     mmap_read_unlock(mm);
     if (ret < 0)
-        xrp_unmap_request(xvp, rq, false, NULL);
+        xrp_unmap_request(xvp, rq, false);
     return ret;
 }
 
@@ -410,7 +402,7 @@ long xrp_ioctl_submit_sync(struct file *filp, struct xrp_ioctl_queue __user *p)
         goto err;
     }
 
-    REGISTER_PERF_TIME(ioctl_received, (&kernel_perf_stats), rq->ioctl_queue.perf_stats_enabled);
+    REGISTER_PERF_TIME(kernel_received_ioctl, (&kernel_perf_stats), rq->ioctl_queue.perf_stats_enabled);
 
     if (rq->ioctl_queue.flags & ~XRP_QUEUE_VALID_FLAGS) {
         dev_err(xvp->dev, "%s: invalid flags 0x%08x\n",
@@ -431,6 +423,7 @@ long xrp_ioctl_submit_sync(struct file *filp, struct xrp_ioctl_queue __user *p)
     }
 
     atomic_inc(&xvp->stats.current_threads);
+    REGISTER_PERF_TIME(waiting_on_mutex, (&kernel_perf_stats), rq->ioctl_queue.perf_stats_enabled);
     mutex_lock(&queue->lock);
     REGISTER_PERF_TIME(mutex_acquired, (&kernel_perf_stats), rq->ioctl_queue.perf_stats_enabled);
 
@@ -474,11 +467,11 @@ long xrp_ioctl_submit_sync(struct file *filp, struct xrp_ioctl_queue __user *p)
 
     if (ret != 0) {
         dev_err(xvp->dev, "%s: failed completing hw request %ld\n", __func__, ret);
-        (void)xrp_unmap_request(xvp, rq, false, &kernel_perf_stats);
+        (void)xrp_unmap_request(xvp, rq, false);
         goto mutex_err;
     }
 
-    ret = xrp_unmap_request(xvp, rq, true, &kernel_perf_stats);
+    ret = xrp_unmap_request(xvp, rq, true);
     if (ret != 0) {
         dev_err(xvp->dev, "%s: failed unmaping request %ld\n", __func__, ret);
         goto mutex_err;
@@ -486,6 +479,14 @@ long xrp_ioctl_submit_sync(struct file *filp, struct xrp_ioctl_queue __user *p)
 
 mutex_err:
     mutex_unlock(&queue->lock);
+     if (rq->ioctl_queue.perf_stats_enabled){
+        REGISTER_PERF_TIME(mutex_released, (&kernel_perf_stats), rq->ioctl_queue.perf_stats_enabled);
+        if (copy_to_user((void __user *)(unsigned long)rq->ioctl_queue.kernel_perf_stats_addr,
+                         &kernel_perf_stats, sizeof(kernel_perf_stats))) {
+            dev_err(xvp->dev, "%s: kernel perf stats could not be copied\n", __func__);
+            ret = -EFAULT;
+        }
+    }
     atomic_dec(&xvp->stats.current_threads);
 err:
     kfree(rq);

@@ -14,4 +14,12 @@
     pl320_mailbox: mailbox {
         reg = <0 0x78003000 0 0x1000>;
     };
+
+    pinctrl: pinctrl@7c291000 {
+        compatible = "hailo15l,pinctrl";
+        reg = <0 0x7c291000 0 0x1000>,
+                <0 0x7c292000 0 0x1000>,
+                <0 0x7c293000 0 0x1000>;
+        reg-names = "general_pads_config_base", "gpio_pads_config_base", "slow_pads_config_base";
+    };
 };

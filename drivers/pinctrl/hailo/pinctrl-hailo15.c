@@ -12,19 +12,10 @@
 #include <linux/of_platform.h>
 #include <linux/pinctrl/pinconf-generic.h>
 
-#include <linux/soc/hailo/scmi_hailo_ops.h>
-
-#define H15__SCU_BOOT_BIT_MASK (3)
-
-static const char *hailo15_boot_options[] = { "Flash", "UART", "PCIe",
-						   "N/A" };
-
 static const unsigned char drive_strength_lookup[16] = {
 	0x0, 0x8, 0x4, 0xc, 0x2, 0xa, 0x6, 0xe,
 	0x1, 0x9, 0x5, 0xd, 0x3, 0xb, 0x7, 0xf,
 };
-
-static const struct scmi_hailo_ops *hailo_protocol_ops;
 
 enum h15_pin_set_value hailo15_get_pin_set(unsigned int pin_number)
 {
@@ -577,7 +568,6 @@ static const struct of_device_id hailo15_pinctrl_of_match[] = {
  * Initialize runtime data and pins with restrictions from U-boot.
  */
 static void initialize_current_state(struct device *dev, struct hailo15_pinctrl *pinctrl) {
-	
 	uint32_t data_reg;
 	uint32_t current_modes[H15_PIN_SET_VALUE__COUNT] = {0, };
 	bool enabled_pins[GENERAL_PADS_CONFIG__PADS_PINMUX] = {false, };
@@ -720,7 +710,6 @@ static int hailo15_pinctrl_probe(struct platform_device *pdev)
 	int ret;
 	unsigned num_pins;
 	unsigned num_functions;
-	struct scmi_hailo_get_boot_info_p2a boot_info;
 
 	num_pins = ARRAY_SIZE(hailo15_pins);
 	num_functions = ARRAY_SIZE(h15_pin_functions);
@@ -730,11 +719,6 @@ static int hailo15_pinctrl_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	pinctrl->dev = dev;
-
-	hailo_protocol_ops = scmi_hailo_get_ops();
-	if (IS_ERR(hailo_protocol_ops)) {
-		return PTR_ERR(hailo_protocol_ops);
-	}
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 					   "general_pads_config_base");
@@ -774,10 +758,6 @@ static int hailo15_pinctrl_probe(struct platform_device *pdev)
 			return ret;
 		}
 	}
-
-	hailo_protocol_ops->get_boot_info(&boot_info);
-	pr_info("SCU booted from:                %s",
-		hailo15_boot_options[boot_info.scu_bootstrap & H15__SCU_BOOT_BIT_MASK]);
 
 	platform_set_drvdata(pdev, pinctrl);
 

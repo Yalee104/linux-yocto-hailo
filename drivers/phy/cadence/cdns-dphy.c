@@ -321,6 +321,10 @@ static int cdns_dphy_power_on(struct phy *phy)
 {
 	struct cdns_dphy *dphy = phy_get_drvdata(phy);
 
+	pm_runtime_get_sync(&phy->dev);
+	pm_runtime_set_active(&phy->dev);
+	pm_runtime_enable(&phy->dev);
+
 	clk_prepare_enable(dphy->psm_clk);
 	clk_prepare_enable(dphy->pll_ref_clk);
 	clk_prepare_enable(dphy->esc_clk);
@@ -340,6 +344,9 @@ static int cdns_dphy_power_off(struct phy *phy)
 	clk_disable_unprepare(dphy->psm_clk);
 	clk_disable_unprepare(dphy->esc_clk);
 
+	pm_runtime_put_sync(&phy->dev);
+	pm_runtime_set_suspended(&phy->dev);
+	pm_runtime_disable(&phy->dev);
 	return 0;
 }
 

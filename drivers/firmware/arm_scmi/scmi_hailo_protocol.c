@@ -40,6 +40,14 @@ static int scmi_hailo_xfer(const struct scmi_protocol_handle *ph, unsigned int c
 static int scmi_hailo_get_boot_info(const struct scmi_protocol_handle *ph, struct scmi_hailo_get_boot_info_p2a *info)
 {
 	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_GET_BOOT_INFO_ID, NULL, 0, info, sizeof(*info));
+
+	dev_dbg(ph->dev, "scmi_hailo_get_boot_info: boot_status_bitmap.boot_success - scu_bl=%d, scu_fw=%d, uboot=%d, linux=%d\n",
+			info->boot_status_bitmap.boot_success_scu_bl, 
+			info->boot_status_bitmap.boot_success_scu_fw,
+			info->boot_status_bitmap.boot_success_ap_bootloader,
+			info->boot_status_bitmap.boot_success_ap_software);
+	dev_dbg(ph->dev, "scmi_hailo_get_boot_info: boot_count=%d, active_image_desc_index=%d, active_boot_image_storage=%d, active_boot_image_offset=0x%08X, bootstrap_image_storage=%d\n",
+			info->boot_count, info->active_image_desc_index, info->active_boot_image_storage, info->active_boot_image_offset, info->bootstrap_image_storage);
 	return ret;
 }
 
@@ -66,12 +74,19 @@ static int scmi_hailo_stop_measure(const struct scmi_protocol_handle *ph, struct
 	return ret;
 }
 
+static int scmi_hailo_send_boot_success_ind(const struct scmi_protocol_handle *ph, struct scmi_hailo_boot_success_indication_a2p *params)
+{
+	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_BOOT_SUCCESS_INDICATION_ID, params, sizeof(*params), NULL, 0);
+	return ret;
+}
+
 static const struct scmi_hailo_proto_ops hailo_proto_ops = {
 	.get_boot_info = scmi_hailo_get_boot_info,
 	.get_fuse_info = scmi_hailo_get_fuse_info,
 	.set_eth_rmii = scmi_hailo_set_eth_rmii,
 	.start_measure = scmi_hailo_start_measure,
 	.stop_measure = scmi_hailo_stop_measure,
+	.send_boot_success_ind = scmi_hailo_send_boot_success_ind,
 };
 
 static int scmi_hailo_protocol_init(const struct scmi_protocol_handle *ph)

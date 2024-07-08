@@ -26,7 +26,8 @@
 
 /* Lines per frame */
 #define IMX334_REG_LPFR		0x3030
-#define IMX334_MAX_LPFR_4K (1 << 20) - 2 - 2160 // max even value of unsigned 20bit - 4k #lines
+#define IMX334_MAX_LPFR_4K (1 << 20) - 2 // max even value of unsigned 20bit
+#define IMX334_MAX_VBLANK_4K (IMX334_MAX_LPFR_4K - 2160) // vmax - height
 
 /* Exposure control */
 #define IMX334_REG_SHUTTER	0x3058
@@ -351,7 +352,7 @@ static const struct imx334_mode supported_modes[] = {
 	.hblank = 560,
 	.vblank = 2340,
 	.vblank_min = 90,
-	.vblank_max = IMX334_MAX_LPFR_4K,
+	.vblank_max = IMX334_MAX_VBLANK_4K,
 	.pclk = 594000000,
 	.link_freq_idx = 0,
 	.code = MEDIA_BUS_FMT_SRGGB12_1X12,
@@ -370,7 +371,7 @@ static const struct imx334_mode supported_modes[] = {
 	.hblank = 560,
 	.vblank = 90,
 	.vblank_min = 90,
-	.vblank_max = IMX334_MAX_LPFR_4K,
+	.vblank_max = IMX334_MAX_VBLANK_4K,
 	.pclk = 594000000,
 	.link_freq_idx = 0,
 	.code = MEDIA_BUS_FMT_SRGGB12_1X12,
@@ -389,7 +390,7 @@ static const struct imx334_mode supported_modes[] = {
 	.hblank = 560,
 	.vblank = 6840,
 	.vblank_min = 90,
-	.vblank_max = IMX334_MAX_LPFR_4K,
+	.vblank_max = IMX334_MAX_VBLANK_4K,
 	.pclk = 594000000,
 	.link_freq_idx = 0,
 	.code = MEDIA_BUS_FMT_SRGGB12_1X12,

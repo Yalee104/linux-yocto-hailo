@@ -43,7 +43,7 @@ struct hailo15_video_node {
 
 	struct hailo15_event_resource event_resource;
 
-	spinlock_t qlock;
+	struct mutex  qlock;
 	struct list_head buf_queue;
 	bool skip_first_list_entry;
 

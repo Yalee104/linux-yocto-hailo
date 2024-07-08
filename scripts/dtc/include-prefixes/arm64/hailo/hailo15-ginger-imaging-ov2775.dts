@@ -52,10 +52,6 @@
     status = "okay";
 };
 
-&csi2tx0 {
-    status = "okay";
-};
-
 &hailo_isp {
     status = "okay";
 };

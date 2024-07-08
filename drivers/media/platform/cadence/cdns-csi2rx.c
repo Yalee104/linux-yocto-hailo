@@ -617,6 +617,10 @@ static int csi2rx_get_resources(struct csi2rx_priv *csi2rx,
 		return -EINVAL;
 	}
 
+	pm_runtime_get_sync(csi2rx->dev);
+	pm_runtime_set_active(csi2rx->dev);
+	pm_runtime_enable(csi2rx->dev);
+
 	ret = clk_prepare_enable(csi2rx->p_clk);
 	if (ret) {
 		dev_err(&pdev->dev, "Couldn't prepare and enable P clock\n");
@@ -885,6 +889,11 @@ static int csi2rx_remove(struct platform_device *pdev)
 	struct csi2rx_priv *csi2rx = platform_get_drvdata(pdev);
 
 	v4l2_async_unregister_subdev(&csi2rx->subdev);
+
+	pm_runtime_put_sync(csi2rx->dev);
+	pm_runtime_set_suspended(csi2rx->dev);
+	pm_runtime_disable(csi2rx->dev);
+
 	kfree(csi2rx);
 
 	return 0;

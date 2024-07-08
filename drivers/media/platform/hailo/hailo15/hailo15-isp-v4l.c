@@ -7,6 +7,7 @@
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
 #include <linux/kernel.h>
+#include <linux/workqueue.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-fh.h>
@@ -26,7 +27,7 @@
 #define HAILO15_ISP_NAME_SIZE 10
 #define HAILO15_ISP_ADDR_SPACE_MAX_SIZE 0x10000
 #define HAILO15_ISP_RMEM_SIZE (32 * 1024 * 1024)
-#define HAILO15_ISP_MCM_MODE_RMEM_EXT_SIZE (10 * 3840 * 2160 * 2)
+#define HAILO15_ISP_MCM_MODE_RMEM_EXT_SIZE (2 * 3840 * 2160 * 2)
 #define HAILO15_ISP_FBUF_SIZE (3840 * 2160 * 2)
 #define HAILO15_ISP_FAKEBUF_SIZE (3840 * 2160 * 3)
 
@@ -636,6 +637,7 @@ static int hailo15_isp_s_stream(struct v4l2_subdev *sd, int enable)
 	struct v4l2_subdev *subdev;
 	struct media_pad *pad;
 	struct hailo15_buffer *pos, *npos;
+	struct hailo15_miv2_mis *miv_pos, *miv_npos;
 	struct hailo15_isp_device *isp_dev =
 		container_of(sd, struct hailo15_isp_device, sd);
 	struct hailo15_dma_ctx *ctx = v4l2_get_subdevdata(&isp_dev->sd);
@@ -686,7 +688,6 @@ static int hailo15_isp_s_stream(struct v4l2_subdev *sd, int enable)
 		if (path < 0 || path >= ISP_MAX_PATH)
 			return -EINVAL;
 		if(path == ISP_MCM_IN){
-			isp_dev->mcm_mode = 0;
 			isp_dev->rdma_enable = 0;
 			isp_dev->dma_ready = 0;
 			isp_dev->frame_end = 0;
@@ -703,7 +704,7 @@ static int hailo15_isp_s_stream(struct v4l2_subdev *sd, int enable)
 
 			return 0;
 		}
-
+		isp_dev->mcm_mode = 0;
 		isp_dev->frame_count[path] = 0;
 		isp_dev->mi_stopped[path] = 1;
 		isp_dev->cur_buf[path] = NULL;
@@ -717,6 +718,12 @@ static int hailo15_isp_s_stream(struct v4l2_subdev *sd, int enable)
 
 		hailo15_isp_reset_hw(isp_dev);
 		hailo15_isp_refcnt_dec_disable(isp_dev);
+		spin_lock_irqsave(&isp_dev->miv2_mis_lock, flags);
+		list_for_each_entry_safe(miv_pos, miv_npos, &isp_dev->miv2_mis_queue, list){
+			list_del(&miv_pos->list);
+			kfree(miv_pos);
+		}
+		spin_unlock_irqrestore(&isp_dev->miv2_mis_lock, flags);
 		return ret;
 	}
 	
@@ -1271,6 +1278,13 @@ static int hailo15_init_isp_device(struct hailo15_isp_device *isp_dev)
 	/*queue_empty field should not be set to 1 as the software assumes empty queue on initialization*/
 	INIT_LIST_HEAD(&isp_dev->mcm_queue);
 	spin_lock_init(&isp_dev->mcm_lock);
+	INIT_LIST_HEAD(&isp_dev->miv2_mis_queue);
+	spin_lock_init(&isp_dev->miv2_mis_lock);
+	isp_dev->miv2_mis_wq = alloc_ordered_workqueue("miv2_mis_wq", WQ_HIGHPRI);
+	INIT_WORK(&isp_dev->miv2_mis_w, hailo15_isp_handle_frame_rx);
+
+	tasklet_init(&isp_dev->fe_tasklet, mcm_fe_irq_tasklet, (unsigned long)isp_dev);
+
 	goto out;
 	
 

@@ -15,6 +15,7 @@ struct scmi_hailo_ops {
     int (*set_eth_rmii)(void);
     int (*start_measure)(struct scmi_hailo_ddr_start_measure_a2p *params);
     int (*stop_measure)(bool *was_running);
+    int (*send_boot_success_ind)(struct scmi_hailo_boot_success_indication_a2p *params);
 };
 
 #if IS_ENABLED(CONFIG_HAILO_SCMI_PROTOCOL)

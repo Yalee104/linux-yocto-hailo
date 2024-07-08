@@ -377,8 +377,8 @@ static int compare_queue_priority(const void *a, const void *b)
 static long xrp_init_common(struct platform_device *pdev, struct xvp *xvp)
 {
     long ret;
-    char nodename[sizeof("xvp") + 3 * sizeof(int)];
-    char log_nodename[sizeof("xvp_log") + 3 * sizeof(int)];
+    char nodename[sizeof("dsp") + 3 * sizeof(int)];
+    char log_nodename[sizeof("dsp_log") + 3 * sizeof(int)];
     int nodeid;
     unsigned i;
     struct xrp_mapping *mapping;

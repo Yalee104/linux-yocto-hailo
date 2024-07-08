@@ -207,6 +207,24 @@ static const struct hailo15_video_fmt __hailo15_out_formats[] = {
 			.hscale_ratio = 1,
 			} },
 	},
+	{
+		.fourcc = V4L2_PIX_FMT_SRGGB12,
+		.code = MEDIA_BUS_FMT_SRGGB12_2X12,
+		.pix_fmt = RAW12,
+		.planarity = INTERLEAVED,
+		.num_planes = 2,
+		.width_modulus = 16,
+		.planes = { {
+			.bpp = 2,
+			.vscale_ratio = 1,
+			.hscale_ratio = 1,
+			},
+			{
+			.bpp = 2,
+			.vscale_ratio = 1,
+			.hscale_ratio = 1,
+			} },
+	},
 
 };
 
@@ -306,7 +324,24 @@ static const struct hailo15_video_fmt __hailo15_formats[] = {
 			.hscale_ratio = 1,
 			} },
 	},
-
+	{
+		.fourcc = V4L2_PIX_FMT_SRGGB12,
+		.code = MEDIA_BUS_FMT_SRGGB12_2X12,
+		.pix_fmt = RAW12,
+		.planarity = INTERLEAVED,
+		.num_planes = 2,
+		.width_modulus = 16,
+		.planes = { {
+			.bpp = 2,
+			.vscale_ratio = 1,
+			.hscale_ratio = 1,
+			},
+			{
+			.bpp = 2,
+			.vscale_ratio = 1,
+			.hscale_ratio = 1,
+			} },
+	},
 };
 
 static inline const struct hailo15_video_fmt *hailo15_get_out_formats(void){

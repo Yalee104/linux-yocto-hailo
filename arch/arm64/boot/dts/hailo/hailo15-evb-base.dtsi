@@ -129,6 +129,10 @@
     };
 };
 
+&vision_subsys {
+    status = "okay";
+};
+
 &csi2rx0 {
     status = "okay";
 };

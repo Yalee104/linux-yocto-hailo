@@ -6,6 +6,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 #include <linux/kthread.h>
+#include <linux/pm_runtime.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-event.h>
 #include <media/v4l2-fh.h>
@@ -748,7 +749,7 @@ hailo15_video_out_node_video_device_register(struct hailo15_video_out_node *vid_
 	if (WARN_ON(!vid_node))
 		return -EINVAL;
 	return video_register_device(vid_node->video_dev, VFL_TYPE_VIDEO,
-				    	vid_node->id);
+				    	vid_node->path);
 }
 
 static int
@@ -995,6 +996,9 @@ static int hailo15_video_probe(struct platform_device *pdev)
 
 	mutex_init(&sd_mutex);
 
+	pm_runtime_get_sync(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
 	goto out;
 	pr_debug("video device probe success\n");
 err_init_nodes:
@@ -1006,6 +1010,10 @@ out:
 static int hailo15_video_remove(struct platform_device *pdev)
 {
 	struct hailo15_vid_out_device *vid_dev;
+
+	pm_runtime_put_sync(&pdev->dev);
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
 
 	mutex_destroy(&sd_mutex);
 	vid_dev = platform_get_drvdata(pdev);

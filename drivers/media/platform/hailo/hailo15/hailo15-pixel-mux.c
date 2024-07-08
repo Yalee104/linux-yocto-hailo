@@ -51,8 +51,8 @@ struct pixel_mux_priv {
 	struct mutex lock;
 
 	void __iomem *base;
-	struct clk *sys_clk;
-	struct clk *clk;
+	struct clk *vision_clk;
+	struct clk *vision_hclk;
 	struct clk *csi_rx0_xtal_clk;
 	struct clk *csi_rx1_xtal_clk;
 	int irq;
@@ -103,6 +103,18 @@ static const struct hailo15_mux_cfg p2a_cfg_3dol = {
 	.isp1_stream1 = DISABLE_VC_4_DT_DISABLE,
 	.isp1_stream2 = DISABLE_VC_4_DT_DISABLE,
 	.vision_buffer_ready_ap_int_mask = 0xff4
+};
+
+static const struct hailo15_mux_cfg p2a_cfg_2dol = {
+	.pixel_mux_cfg =
+		P2A0_2_CSIRX0_P2A1_2_CSIRX1_ISP0_2_SW_DBG_ISP1_2_SW_DBG,
+	.isp0_stream0 = DISABLE_VC_4_DT_DISABLE,
+	.isp0_stream1 = DISABLE_VC_4_DT_DISABLE,
+	.isp0_stream2 = DISABLE_VC_4_DT_DISABLE,
+	.isp1_stream0 = DISABLE_VC_4_DT_DISABLE,
+	.isp1_stream1 = DISABLE_VC_4_DT_DISABLE,
+	.isp1_stream2 = DISABLE_VC_4_DT_DISABLE,
+	.vision_buffer_ready_ap_int_mask = 0xff2
 };
 
 static const struct hailo15_mux_cfg p2a_cfg_sdr = {
@@ -239,7 +251,19 @@ static int pixel_mux_s_stream(struct v4l2_subdev *sd, int enable)
 		return -EINVAL;
 
 	if (enable && !pixel_mux->dest_configured) {
-		// TODO - remove this when we have the ability to make clocks that are not in the same heirarchy depend on each other (MSW-2254)
+		dev_dbg(pixel_mux->dev, "%s enabling vision_hclk\n", __func__);
+		ret = clk_prepare_enable(pixel_mux->vision_hclk);
+		if (ret) {
+			pr_err("%s - failed enabling vision_hclk\n", __func__);
+			return -EAGAIN;
+		}
+		dev_dbg(pixel_mux->dev, "%s enabling vision_clk\n", __func__);
+		ret = clk_prepare_enable(pixel_mux->vision_clk);
+		if (ret) {
+			pr_err("%s - failed enabling vision_clk\n", __func__);
+			return -EAGAIN;
+		}
+		// TODO - understand who should open the csi xtal clk, and why
 		dev_dbg(pixel_mux->dev, "%s enabling csi_rx0_xtal_clk\n",
 			__func__);
 		ret = clk_prepare_enable(pixel_mux->csi_rx0_xtal_clk);
@@ -253,12 +277,24 @@ static int pixel_mux_s_stream(struct v4l2_subdev *sd, int enable)
 		    sd->grp_id == VID_GRP_ISP_SP) {
 			hailo_pixel_mux_configure_dest(pixel_mux, &isp_cfg);
 		} else if (sd->grp_id == VID_GRP_P2A) {
-			if (pixel_mux->num_exposures == 3)
-				hailo_pixel_mux_configure_dest(pixel_mux,
-							       &p2a_cfg_3dol);
-			else
-				hailo_pixel_mux_configure_dest(pixel_mux,
-							       &p2a_cfg_sdr);
+			switch (pixel_mux->num_exposures) {
+				case 1:
+					hailo_pixel_mux_configure_dest(pixel_mux,
+									&p2a_cfg_sdr);
+					break;
+				case 2:
+					hailo_pixel_mux_configure_dest(pixel_mux,
+									&p2a_cfg_2dol);
+					break;
+				case 3:
+					hailo_pixel_mux_configure_dest(pixel_mux,
+									&p2a_cfg_3dol);
+					break;
+				default:
+					hailo_pixel_mux_configure_dest(pixel_mux,
+									&p2a_cfg_sdr);
+					break;
+			}
 		} else {
 			ret = -EINVAL;
 			goto err_bad_src_grp;
@@ -319,6 +355,7 @@ static int pixel_mux_set_fmt(struct v4l2_subdev *sd,
 	unsigned int sink_pad_idx = PIXEL_MUX_PAD_SOURCE_0;
 	const struct v4l2_mbus_framefmt *src_format = &fmt->format;
 	struct v4l2_mbus_framefmt *dst_format;
+	struct v4l2_subdev_format csi_fmt = {0};
 	int ret = 0;
 
 	if (!pixel_mux)
@@ -333,7 +370,10 @@ static int pixel_mux_set_fmt(struct v4l2_subdev *sd,
 	switch (src_format->code) {
 	case MEDIA_BUS_FMT_SRGGB12_1X12:
 		pixel_mux->num_exposures = 1;
-		break;	
+		break;
+	case MEDIA_BUS_FMT_SRGGB12_2X12:
+		pixel_mux->num_exposures = 2;
+		break;
 	case MEDIA_BUS_FMT_SRGGB12_3X12:
 		pixel_mux->num_exposures = 3;
 		break;
@@ -342,19 +382,21 @@ static int pixel_mux_set_fmt(struct v4l2_subdev *sd,
 		break;
 	}
 	
+	memcpy(&csi_fmt, fmt, sizeof(struct v4l2_subdev_format));
+
 	/* change format to one of two: x16 or x32 */
 	if (sd->grp_id == VID_GRP_ISP_MP ||
 		sd->grp_id == VID_GRP_ISP_SP) {
-		fmt->format.code = MEDIA_BUS_FMT_SRGGB12_1X32;
+		csi_fmt.format.code = MEDIA_BUS_FMT_SRGGB12_1X32;
 	} else if (sd->grp_id == VID_GRP_P2A) {
-		fmt->format.code = MEDIA_BUS_FMT_SRGGB12_1X12;
+		csi_fmt.format.code = MEDIA_BUS_FMT_SRGGB12_1X12;
 	} else {
 		ret = -EINVAL;
 		goto err_bad_src_grp;
 	}
 
 	/* Propagate fake format to sink */
-	sink_pad_idx = (int)(fmt->pad/2);
+	sink_pad_idx = (int)(csi_fmt.pad/2);
 	pad = &pixel_mux->pads[sink_pad_idx];
 	if (pad)
 		pad = media_entity_remote_pad(pad);
@@ -362,7 +404,7 @@ static int pixel_mux_set_fmt(struct v4l2_subdev *sd,
 	if (pad && is_media_entity_v4l2_subdev(pad->entity)) {
 		subdev = media_entity_to_v4l2_subdev(pad->entity);
 		subdev->grp_id = sd->grp_id;
-		ret = v4l2_subdev_call(subdev, pad, set_fmt, NULL, fmt);
+		ret = v4l2_subdev_call(subdev, pad, set_fmt, NULL, &csi_fmt);
 	}
 	goto finish;
 
@@ -486,13 +528,26 @@ static int pixel_mux_probe(struct platform_device *pdev)
 	}
 	pixel_mux->base = devm_ioremap_resource(&pdev->dev, res);
 
-	// TODO - remove this when we have the ability to make clocks that are not in the same heirarchy depend on each other (MSW-2254)
 	pixel_mux->csi_rx0_xtal_clk =
 		devm_clk_get(&pdev->dev, "csi_rx0_xtal_clk");
 	if (IS_ERR(pixel_mux->csi_rx0_xtal_clk)) {
 		dev_err(&pdev->dev,
 			"Couldn't get pixel_mux->csi_rx0_xtal_clk clock\n");
 		return PTR_ERR(pixel_mux->csi_rx0_xtal_clk);
+	}
+
+	pixel_mux->vision_clk = devm_clk_get(&pdev->dev, "vision_clk");
+	if (IS_ERR(pixel_mux->vision_clk)) {
+		dev_err(&pdev->dev,
+			"Couldn't get pixel_mux->vision_clk clock\n");
+		return PTR_ERR(pixel_mux->vision_clk);
+	}
+
+	pixel_mux->vision_hclk = devm_clk_get(&pdev->dev, "vision_hclk");
+	if (IS_ERR(pixel_mux->vision_hclk)) {
+		dev_err(&pdev->dev,
+			"Couldn't get pixel_mux->vision_hclk clock\n");
+		return PTR_ERR(pixel_mux->vision_hclk);
 	}
 
 	subdev = &pixel_mux->subdev;
@@ -538,6 +593,10 @@ static int pixel_mux_probe(struct platform_device *pdev)
 		goto err_init_dma_ctx;
 	}
 
+	pm_runtime_get_sync(&pdev->dev);
+	pm_runtime_set_active(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	ret = v4l2_async_register_subdev(subdev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "%s Async register failed, ret=%d\n",
@@ -565,6 +624,11 @@ static int pixel_mux_remove(struct platform_device *pdev)
 
 	media_entity_cleanup(&pixel_mux->subdev.entity);
 	v4l2_async_unregister_subdev(&pixel_mux->subdev);
+
+	pm_runtime_put_sync(&pdev->dev);
+	pm_runtime_set_suspended(&pdev->dev);
+	pm_runtime_disable(&pdev->dev);
+
 	kfree(pixel_mux);
 
 	return 0;

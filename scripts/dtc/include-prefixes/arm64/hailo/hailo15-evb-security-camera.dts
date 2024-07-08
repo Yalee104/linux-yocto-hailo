@@ -90,6 +90,10 @@
     status = "okay";
 };
 
+&hailo_pci_ep_driver {
+    status = "okay";
+};
+
 &serial0 { 
  status = "okay"; 
 }; 

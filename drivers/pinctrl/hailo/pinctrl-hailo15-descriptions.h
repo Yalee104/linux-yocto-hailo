@@ -108,8 +108,8 @@ static const unsigned flash_cs_out_pad_2_pins[] = { 0 };
 static const unsigned flash_cs_out_pad_2_pin_directions[] =
 	H15_PIN_DIRECTIONS(OUT);
 
-static const unsigned pwm0_pins[] = { 0, 1 };
-static const unsigned pwm0_pin_directions[] = H15_PIN_DIRECTIONS(OUT, OUT);
+static const unsigned pwm0_0_pins[] = { 0, 1 };
+static const unsigned pwm0_0_pin_directions[] = H15_PIN_DIRECTIONS(OUT, OUT);
 
 static const unsigned safety_out0_0_pins[] = { 0 };
 static const unsigned safety_out0_0_pin_directions[] = H15_PIN_DIRECTIONS(OUT);
@@ -385,8 +385,8 @@ static const unsigned gpio21_pin_directions[] = H15_PIN_DIRECTIONS(BIDIR);
 static const unsigned i2c3_1_pins[] = { 20, 21 };
 static const unsigned i2c3_1_pin_directions[] = H15_PIN_DIRECTIONS(BIDIR, OUT);
 
-static const unsigned pwm3_pins[] = { 20, 21 };
-static const unsigned pwm3_pin_directions[] = H15_PIN_DIRECTIONS(OUT, OUT);
+static const unsigned pwm0_1_pins[] = { 20, 21 };
+static const unsigned pwm0_1_pin_directions[] = H15_PIN_DIRECTIONS(OUT, OUT);
 
 static const unsigned gpio22_pins[] = { 22 };
 static const unsigned gpio22_pin_directions[] = H15_PIN_DIRECTIONS(BIDIR);
@@ -439,8 +439,8 @@ static const unsigned sdio1_gp_out_3_pin_directions[] = H15_PIN_DIRECTIONS(OUT);
 static const unsigned gpio28_pins[] = { 28 };
 static const unsigned gpio28_pin_directions[] = H15_PIN_DIRECTIONS(BIDIR);
 
-static const unsigned pwm4_pins[] = { 27, 28 };
-static const unsigned pwm4_pin_directions[] = H15_PIN_DIRECTIONS(OUT, OUT);
+static const unsigned pwm0_2_pins[] = { 27, 28 };
+static const unsigned pwm0_2_pin_directions[] = H15_PIN_DIRECTIONS(OUT, OUT);
 
 static const unsigned cpu_trace_clk_pins[] = { 27 };
 static const unsigned cpu_trace_clk_pin_directions[] = H15_PIN_DIRECTIONS(OUT);
@@ -489,7 +489,7 @@ static const struct h15_pin_set_modes flash_cs_out_pad_2_set_modes[] = {
 	H15_PIN_SET_MODES(H15_PIN_SET_VALUE__1_0, BIT(4)),
 };
 
-static const struct h15_pin_set_modes pwm0_set_modes[] = {
+static const struct h15_pin_set_modes pwm0_0_set_modes[] = {
 	H15_PIN_SET_MODES(H15_PIN_SET_VALUE__1_0, BIT(5)),
 };
 
@@ -855,7 +855,7 @@ static const struct h15_pin_set_modes timer_ext_in1_set_modes[] = {
 static const struct h15_pin_set_modes i2c3_1_set_modes[] = { H15_PIN_SET_MODES(
 	H15_PIN_SET_VALUE__31_16, BIT(5)) };
 
-static const struct h15_pin_set_modes pwm3_set_modes[] = { H15_PIN_SET_MODES(
+static const struct h15_pin_set_modes pwm0_1_set_modes[] = { H15_PIN_SET_MODES(
 	H15_PIN_SET_VALUE__31_16, BIT(7)) };
 
 static const struct h15_pin_set_modes i2c2_1_set_modes[] = { H15_PIN_SET_MODES(
@@ -889,7 +889,7 @@ static const struct h15_pin_set_modes sdio1_gp_out_3_set_modes[] = {
 	H15_PIN_SET_MODES(H15_PIN_SET_VALUE__31_16, BIT(7))
 };
 
-static const struct h15_pin_set_modes pwm4_set_modes[] = { H15_PIN_SET_MODES(
+static const struct h15_pin_set_modes pwm0_2_set_modes[] = { H15_PIN_SET_MODES(
 	H15_PIN_SET_VALUE__31_16, BIT(0)) };
 
 static const struct h15_pin_set_modes cpu_trace_clk_set_modes[] = {
@@ -976,11 +976,11 @@ static const struct h15_pin_group h15_pin_groups[] = {
 	H15_PIN_GROUP(parallel_in_16pins),
 	H15_PIN_GROUP(parallel_in_24pins),
 	H15_PIN_GROUP(pcie_mperst_out),
-	H15_PIN_GROUP(pwm0),
+	H15_PIN_GROUP(pwm0_0),
+	H15_PIN_GROUP(pwm0_1),
+	H15_PIN_GROUP(pwm0_2),
 	H15_PIN_GROUP(pwm1),
 	H15_PIN_GROUP(pwm2),
-	H15_PIN_GROUP(pwm3),
-	H15_PIN_GROUP(pwm4),
 	H15_PIN_GROUP(safety_out0_0),
 	H15_PIN_GROUP(safety_out0_1),
 	H15_PIN_GROUP(safety_out0_2),
@@ -1039,7 +1039,9 @@ static const char *const flash_cs_out_pad_2_grps[] = {
 	"flash_cs_out_pad_2_grp"
 };
 
-static const char *const pwm0_grps[] = { "pwm0_grp" };
+static const char *const pwm0_grps[] = { "pwm0_0_grp",
+					 "pwm0_1_grp",
+					 "pwn0_2_grp" };
 
 static const char *const safety_out0_grps[] = { "safety_out0_0_grp",
 						"safety_out0_1_grp",
@@ -1159,10 +1161,6 @@ static const char *const timer_ext_in0_grps[] = { "timer_ext_in0_grp" };
 
 static const char *const timer_ext_in1_grps[] = { "timer_ext_in1_grp" };
 
-static const char *const pwm3_grps[] = { "pwm3_grp" };
-
-static const char *const pwm4_grps[] = { "pwm4_grp" };
-
 static const char *const cpu_trace_clk_grps[] = { "cpu_trace_clk_grp" };
 
 static const char *const uart2_cts_rts_grps[] = { "uart2_cts_rts_grp" };
@@ -1188,8 +1186,6 @@ static const struct h15_pin_function h15_pin_functions[] = {
 	H15_PIN_FUNCTION(pwm0),
 	H15_PIN_FUNCTION(pwm1),
 	H15_PIN_FUNCTION(pwm2),
-	H15_PIN_FUNCTION(pwm3),
-	H15_PIN_FUNCTION(pwm4),
 
 	H15_PIN_FUNCTION(i2c2),
 	H15_PIN_FUNCTION(i2c3),
