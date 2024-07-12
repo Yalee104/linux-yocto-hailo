@@ -16,7 +16,7 @@
 
 &i2c_0 {
     status = "ok";
-    imx678: camera-sensor@1a {
+    sensor_0: camera-sensor@1a {
         status = "ok";
         compatible = "sony,imx678";
         reg = <0x1a>;
@@ -125,6 +125,7 @@
 &sdio0 {
     status = "ok";
     broken-cd;
+    sdhci-caps= <0 0x01000000>; // Force VOLT33 capability
     phy-config {
 		card-is-emmc = <0x0>;
 		cmd-pad-values = <0x1 0x3 0x1 0x1>; // txslew_ctrl_n, txslew_ctrl_p, weakpull_enable, rxsel
