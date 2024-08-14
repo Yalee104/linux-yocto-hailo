@@ -1084,7 +1084,7 @@ static int hailo15_video_device_buffer_done(struct hailo15_dma_ctx *ctx,
 	}
 	if (vid_node->prev_buf) {
 		vid_node->prev_buf->vb.sequence = vid_node->sequence++;
-		vid_node->prev_buf->vb.vb2_buf.timestamp = ktime_get_ns();
+		vid_node->prev_buf->vb.vb2_buf.timestamp = ktime_get_raw_ns();
 		vb2_buffer_done(&vid_node->prev_buf->vb.vb2_buf,
 				VB2_BUF_STATE_DONE);
 		vid_node->prev_buf = NULL;

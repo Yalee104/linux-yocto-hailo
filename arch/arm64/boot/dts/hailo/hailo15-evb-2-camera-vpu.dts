@@ -218,11 +218,3 @@
         line-name = "DSI_INTR";
     };
 };
-
-&torrent_phy {
-    status = "okay";
-};
-
-&usb3 {
-    status = "okay";
-};

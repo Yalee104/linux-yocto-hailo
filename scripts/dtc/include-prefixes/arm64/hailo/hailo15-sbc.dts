@@ -235,6 +235,28 @@
     status = "ok";
     pinctrl-names = "default";
     pinctrl-0 = <&pinctrl_i2c2>, <&pinctrl_i2c2_current_src_en_out>;
+    gyro_lsm6dsr_2: lsm6dsr_2@6b {
+        compatible = "st,lsm6dsr";
+        reg = <0x6b>;
+        vdd-supply = <&regulator_1p8v>;
+        vddio-supply = <&regulator_1p8v>;
+        interrupt-parent = <&gpio1>;
+        interrupts = <5 IRQ_TYPE_EDGE_RISING>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_gpio21>;
+    };
+
+    gyro_icm42670_2: icm42670_2@69 {
+        status = "disabled";
+        compatible = "invensense,icm42670";
+        reg = <0x69>;
+        vdd-supply = <&regulator_1p8v>;
+        vddio-supply = <&regulator_1p8v>;
+        interrupt-parent = <&gpio1>;
+        interrupts = <5 IRQ_TYPE_EDGE_RISING>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_gpio21>;
+	};
 };
 
 &pinctrl {
@@ -303,6 +325,11 @@
         function = "usb_drive_vbus_out";
         groups = "usb_drive_vbus_out_2_grp";
     };
+
+    pinctrl_gpio21: gpio21 {
+        function = "gpio";
+        groups = "gpio21_grp";
+    };
 };
 
 &gpio0 {
@@ -363,8 +390,14 @@
     };
 };
 
-&torrent_phy {
+&hailo_torrent_phy {
     status = "okay";
+    usb-lane = <3>;
+    usb-lane-pma-pll-full-rate-divider = <PCI_PMA_PLL_FULL_RATE_CLK_DIVIDER_4>;
+    lanes-config = <PCI_PHY_LINK_LANES_CFG__2x1_PLUS_1x2__MASTER_LANES_LN0_LN2_LN3>;
+};
+
+&cdns_torrent_phy {
     torrent_phy_pcie: phy@0 {
         reg = <0>;
         resets = <&scmi_reset HAILO15_SCMI_RESET_IDX_PCIE_PHY_LANE_0>, <&scmi_reset HAILO15_SCMI_RESET_IDX_PCIE_PHY_LANE_1>;
@@ -382,8 +415,11 @@
     };
 };
 
-&usb3 {
+&hailo_usb3 {
     status = "okay";
+};
+
+&cdns_usb3 {
     dr_mode = "host";
     phys = <&torrent_phy_usb3>;
     phy-names = "cdns3,usb3-phy";

@@ -90,10 +90,12 @@ struct hailo15_isp_sink_pad_handle {
 	struct media_pad *pad;
 	int remote_pad;
 };
-enum { ISP_MP,
-       ISP_SP2,
-       ISP_MCM_IN,
-       ISP_MAX_PATH,
+
+enum hailo15_isp_path {
+	ISP_MP,
+	ISP_SP2,
+	ISP_MCM_IN,
+	ISP_MAX_PATH,
 };
 
 struct hailo15_isp_pad_data {

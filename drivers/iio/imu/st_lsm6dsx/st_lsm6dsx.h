@@ -307,6 +307,7 @@ struct st_lsm6dsx_settings {
 		struct st_lsm6dsx_reg clear_on_read;
 		struct st_lsm6dsx_reg hla;
 		struct st_lsm6dsx_reg od;
+		struct st_lsm6dsx_reg trig_mode;
 	} irq_config;
 	struct st_lsm6dsx_reg drdy_mask;
 	struct st_lsm6dsx_odr_table_entry odr_table[2];
@@ -331,6 +332,13 @@ enum st_lsm6dsx_sensor_id {
 enum st_lsm6dsx_fifo_mode {
 	ST_LSM6DSX_FIFO_BYPASS = 0x0,
 	ST_LSM6DSX_FIFO_CONT = 0x6,
+};
+
+enum st_lsm6sdx_trig_mode {
+	ST_LSM6DSX_TRIG_MODE_EDGE = 0x4,
+	ST_LSM6DSX_TRIG_MODE_LEVEL = 0x2,
+	ST_LSM6DSX_TRIG_MODE_LEVEL_LATCHED = 0x3,
+	ST_LSM6DSX_TRIG_MODE_LEVEL_FIFO_ENABLED = 0x6,
 };
 
 /**
@@ -404,6 +412,7 @@ struct st_lsm6dsx_hw {
 	u8 enable_mask;
 	u8 fifo_mask;
 	s64 ts_gain;
+	s64 actual_odr;
 	u8 ts_sip;
 	u8 sip;
 

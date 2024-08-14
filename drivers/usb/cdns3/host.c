@@ -63,6 +63,8 @@ static int __cdns_host_init(struct cdns *cdns)
 
 	if (cdns->pdata && (cdns->pdata->quirks & CDNS3_DEFAULT_PM_RUNTIME_ALLOW))
 		cdns->xhci_plat_data->quirks |= XHCI_DEFAULT_PM_RUNTIME_ALLOW;
+	if (cdns->pdata && (cdns->pdata->xhci_init_quirk))
+		cdns->xhci_plat_data->init_quirk = cdns->pdata->xhci_init_quirk;
 
 	ret = platform_device_add_data(xhci, cdns->xhci_plat_data,
 			sizeof(struct xhci_plat_priv));

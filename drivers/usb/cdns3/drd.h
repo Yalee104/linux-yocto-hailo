@@ -196,6 +196,9 @@ struct cdns_otg_irq_regs {
 /* Vbusvalid/Sesvalid override select. */
 #define OVERRIDE_SESS_VLD_SEL		BIT(10)
 
+#define OVERRIDE_OVERCURRENT_SEL BIT(12)
+#define OVERRIDE_OVERCURRENT_SFR BIT(13)
+
 /* PHYRST_CFG - bitmasks */
 #define PHYRST_CFG_PHYRST_A_ENABLE     BIT(0)
 

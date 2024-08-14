@@ -10,6 +10,7 @@
  */
 #include <linux/usb/otg.h>
 #include <linux/usb/role.h>
+#include <linux/usb/hcd.h>
 
 #ifndef __LINUX_CDNS3_CORE_H
 #define __LINUX_CDNS3_CORE_H
@@ -42,6 +43,7 @@ struct cdns_role_driver {
 struct cdns3_platform_data {
 	int (*platform_suspend)(struct device *dev,
 			bool suspend, bool wakeup);
+	int (*xhci_init_quirk)(struct usb_hcd *);
 	unsigned long quirks;
 #define CDNS3_DEFAULT_PM_RUNTIME_ALLOW	BIT(0)
 };

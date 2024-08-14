@@ -64,10 +64,31 @@ void hailo15_isp_reset_hw(struct hailo15_isp_device* isp_dev){
 }
 EXPORT_SYMBOL(hailo15_isp_reset_hw);
 
+static enum mcm_rd_fmt hailo15_isp_mcm_rd_cfg(int mcm_mode) {
+    switch (mcm_mode) {
+        case ISP_MCM_MODE_STITCHING:
+            return MCM_RD_FMT_20BIT;
+        case ISP_MCM_MODE_INJECTION:
+            return MCM_RD_FMT_12BIT;
+        case ISP_MCM_MODE_OFF:
+        case ISP_MCM_MODE_MAX:
+        default:
+            return MCM_RD_FMT_INVALID;
+    }
+}
+
 static void hailo15_isp_configure_mcm_rdma(struct hailo15_isp_device* isp_dev){
 
 	int width, height;
 	uint32_t mi_mcm_ctrl, mcm_rd_cfg, mi_ctrl, mi_mcm_fmt, mi_imsc;
+
+	uint32_t rd_cfg_for_mcm_mode = hailo15_isp_mcm_rd_cfg(isp_dev->mcm_mode);
+
+	if (rd_cfg_for_mcm_mode == MCM_RD_FMT_INVALID) {
+		pr_err("Invalid MCM mode %d\n", isp_dev->mcm_mode);
+		return;
+	}
+
 	width = isp_dev->input_fmt.format.width;
 	height = isp_dev->input_fmt.format.height;
 	mi_ctrl = hailo15_isp_read_reg(isp_dev, MI_CTRL);
@@ -80,7 +101,7 @@ static void hailo15_isp_configure_mcm_rdma(struct hailo15_isp_device* isp_dev){
 	hailo15_isp_write_reg(isp_dev, MI_MCM_DMA_RAW_PIC_LVAL, width*sizeof(uint16_t));
 	hailo15_isp_write_reg(isp_dev, MI_MCM_DMA_RAW_PIC_SIZE, width*height*sizeof(uint16_t));
 	mcm_rd_cfg = hailo15_isp_read_reg(isp_dev, MCM_RD_CFG);
-	mcm_rd_cfg = MCM_RD_FMT;
+	mcm_rd_cfg = rd_cfg_for_mcm_mode;
 	hailo15_isp_write_reg(isp_dev, MCM_RD_CFG, mcm_rd_cfg);
 	mi_mcm_fmt = hailo15_isp_read_reg(isp_dev, MI_MCM_FMT);
 	mi_mcm_fmt |= MCM_RD_RAW_BIT;

@@ -45,7 +45,10 @@
     /* set Linux,CMA area to 1 GiB */
     cma: linux,cma {
         size = <0x0 0x40000000>;
-        alloc-ranges = <0x0 0x82000000 0x0 0x40000000>;
+        alloc-ranges = <0x0 0x86000000 0x0 0x40000000>;
+    };
+    hailo_media_buf_cma: hailo_media_buf,cma {
+        status = "disabled";
     };
 };
 

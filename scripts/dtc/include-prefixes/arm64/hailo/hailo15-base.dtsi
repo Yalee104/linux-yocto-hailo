@@ -42,4 +42,9 @@
         reg-names = "general_pads_config_base", "gpio_pads_config_base";
     };
 
+    vision_subsys: vision_subsys {
+        csi2rx1: csi-bridge@7c015000 {
+            power-domains = <&scmi_devpd HAILO15_SCMI_POWER_DOMAIN_IDX_CSI_RX1>;
+        };
+    };
 };
