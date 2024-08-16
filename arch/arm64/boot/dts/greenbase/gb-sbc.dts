@@ -170,6 +170,19 @@
     };
 };
 
+&hailo_usb3 {
+    status = "okay";
+    disconnected-overcurrent;
+};
+
+&cdns_usb3 {
+    dr_mode = "host";
+    maximum-speed = "high-speed";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_usb_overcurrent_n_in>, <&pinctrl_usb_drive_vbus_out>;
+};
+
+
 &i2s_cpu_master {
     status = "okay";
     rx-sample-pace-pattern-repetitions = <2>;
