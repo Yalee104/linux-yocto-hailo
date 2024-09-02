@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include "hailo15-isp.h"
 #include "hailo15-isp-hw.h"
+#include "hailo15-isp-events.h"
 #include "hailo15-media.h"
 #include "common.h"
 
@@ -505,15 +506,17 @@ static long hailo15_vsi_isp_priv_ioctl(struct v4l2_subdev *sd, unsigned int cmd,
 
 static int hailo15_vsi_isp_init_events(struct hailo15_isp_device *isp_dev)
 {
+	size_t size = HAILO15_EVENT_RESOURCE_DATA_SIZE + offsetof(struct hailo15_isp_event_pkg, data);
+	size_t size_page_align = PAGE_ALIGN(size);
+
 	mutex_init(&isp_dev->event_resource.event_lock);
-	isp_dev->event_resource.virt_addr =
-		kmalloc(HAILO15_EVENT_RESOURCE_SIZE, GFP_KERNEL);
+	isp_dev->event_resource.virt_addr = kmalloc(size_page_align, GFP_KERNEL);
 	if (!isp_dev->event_resource.virt_addr)
 		return -ENOMEM;
 
 	isp_dev->event_resource.phy_addr =
 		virt_to_phys(isp_dev->event_resource.virt_addr);
-	isp_dev->event_resource.size = HAILO15_EVENT_RESOURCE_SIZE;
+	isp_dev->event_resource.size = size;
 	memset(isp_dev->event_resource.virt_addr, 0,
 		   isp_dev->event_resource.size);
 	return 0;
