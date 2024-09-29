@@ -13,6 +13,7 @@
 #include <media/v4l2-ioctl.h>
 #include <media/videobuf2-dma-contig.h>
 #include "hailo15-events.h"
+#include "hailo15-video-events.h"
 #include "hailo15-media.h"
 
 #define HAILO_VID_NAME "hailo_video"
@@ -877,7 +878,10 @@ static int hailo15_video_node_mmap(struct file *file,
 	if (vma->vm_pgoff == video_event_pfn || (vma->vm_pgoff == sd_event_pfn && sd_event_valid)) {
 		size = vma->vm_end - vma->vm_start;
 
-		if (size > HAILO15_EVENT_RESOURCE_SIZE) {
+		/* mmap size alignment granularity set to PAGE_SIZE. 
+		   event_resource size is slightly greater than 4 x PAGE_SIZE,
+		   Thus, compare expression checking is to "size + PAGE_SIZE" */
+		if (size > HAILO15_EVENT_RESOURCE_MAX_MAP_SIZE) {
 			pr_err("%s - not enough memory for 0x%lx size\n",
 				   __func__, size);
 			return -ENOMEM;
@@ -1084,7 +1088,7 @@ static int hailo15_video_device_buffer_done(struct hailo15_dma_ctx *ctx,
 	}
 	if (vid_node->prev_buf) {
 		vid_node->prev_buf->vb.sequence = vid_node->sequence++;
-		vid_node->prev_buf->vb.vb2_buf.timestamp = ktime_get_ns();
+		vid_node->prev_buf->vb.vb2_buf.timestamp = ktime_get_raw_ns();
 		vb2_buffer_done(&vid_node->prev_buf->vb.vb2_buf,
 				VB2_BUF_STATE_DONE);
 		vid_node->prev_buf = NULL;
@@ -1439,15 +1443,22 @@ static int hailo15_video_node_init_fmt(struct hailo15_video_node *vid_node)
 
 static int hailo15_video_node_init_events(struct hailo15_video_node *vid_node)
 {
+	size_t size = HAILO15_EVENT_RESOURCE_DATA_SIZE + offsetof(struct hailo15_video_event_pkg, data);
+	size_t size_page_align = PAGE_ALIGN(size);
+
 	mutex_init(&vid_node->event_resource.event_lock);
 	vid_node->event_resource.virt_addr =
-		kmalloc(HAILO15_EVENT_RESOURCE_SIZE, GFP_KERNEL);
+		kmalloc( size_page_align , GFP_KERNEL);
 	if (!vid_node->event_resource.virt_addr)
 		return -ENOMEM;
 
 	vid_node->event_resource.phy_addr =
 		virt_to_phys(vid_node->event_resource.virt_addr);
-	vid_node->event_resource.size = HAILO15_EVENT_RESOURCE_SIZE;
+
+	vid_node->event_resource.size = size;
+	memset(vid_node->event_resource.virt_addr, 0,
+		   vid_node->event_resource.size);
+
 	return 0;
 }
 

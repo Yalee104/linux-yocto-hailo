@@ -450,7 +450,8 @@ int st_lsm6dsx_read_fifo(struct st_lsm6dsx_hw *hw)
 				 */
 				if (!reset_ts && ts >= 0xff0000)
 					reset_ts = true;
-				ts *= hw->ts_gain;
+				//ts *= hw->ts_gain;
+				ts = (ts * hw->ts_gain) / 1000000;
 
 				offset += ST_LSM6DSX_SAMPLE_SIZE;
 			}
@@ -570,6 +571,7 @@ int st_lsm6dsx_read_tagged_fifo(struct st_lsm6dsx_hw *hw)
 	int i, err, read_len;
 	__le16 fifo_status;
 	s64 ts = 0;
+	static int samples_cnt = 0;
 
 	err = st_lsm6dsx_read_locked(hw,
 				     hw->settings->fifo_ops.fifo_diff.addr,
@@ -618,9 +620,13 @@ int st_lsm6dsx_read_tagged_fifo(struct st_lsm6dsx_hw *hw)
 				 * to signal the hw timestamp will reset in
 				 * 1.638s)
 				 */
+				samples_cnt++;
 				if (!reset_ts && ts >= 0xffff0000)
 					reset_ts = true;
-				ts *= hw->ts_gain;
+				if (!reset_ts && samples_cnt > 0 && (samples_cnt % (hw->actual_odr * 2)) == 0)
+				 	reset_ts = true;
+				//ts *= hw->ts_gain;
+				ts = (ts * hw->ts_gain) / 1000000;
 			} else {
 				st_lsm6dsx_push_tagged_data(hw, tag, iio_buff,
 							    ts);

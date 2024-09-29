@@ -100,17 +100,18 @@
 
 /*
  * Both bus voltage and shunt voltage conversion times for ina226 are set
- * to 0b0111 on POR, which translates to (8244*2) = 16488 microseconds in total.
- * The user can set the update_interval	(The interval at which the chip will update readings).
+ * to 0b010 on POR, which translates to (332*2) = 664 microseconds in total.
+ * The user can set the bus voltage, shunt voltage conversion time and the averaging factor, 
+ * The user can read the update_interval which is 2 * averaging_factor * sampling_period{ms} (one sample for current and the one for voltage)
  * The sensor samples the power every sampling_period {ms} and averages every
- * averaging_factor samples. The sensor provides a new value every: update_interval = 2 * averaging_factor  * sampling_period{ms}.
+ * averaging_factor samples. So, as mentioned, the sensor provides a new value every:
+ * update_interval = 2 * averaging_factor  * sampling_period{ms}.
  * In case the user update the update_interval, the driver find the closest averaging_factor to fit it.
  * The sampling_period stay in is default values and didn't changed.
  */
-#define INA226_TOTAL_CONV_TIME_DEFAULT (16488)
-#define INA226_TOTAL_CONV_TIME_REG_VALUE_DEFAULT (7)
+#define INA226_TOTAL_CONV_TIME_REG_INDEX_DEFAULT (2)
 
-#define INA226_AVERAGING_FACTOR_DEFAULT (16)
+#define INA226_AVERAGING_FACTOR_INDEX_DEFAULT (7)
 
 /* Largest calibration value for a 15-bit valid range */
 #define INA2XX_CALIBRATION_MAX 0x7FFF
@@ -164,32 +165,18 @@ static const struct ina2xx_precise_config ina2xx_precise_config = {
  * https://www.ti.com/lit/ds/symlink/ina226.pdf.
  */
 static const int ina226_avg_tab[] = { 1, 4, 16, 64, 128, 256, 512, 1024 };
+static const int ina226_conv_time_tab[] = {140, 204, 332, 588, 1100, 2116, 4156, 8244};
 
-static int ina226_reg_to_interval(u16 config)
+static int ina2xx_total_conv_time_index = INA226_TOTAL_CONV_TIME_REG_INDEX_DEFAULT;
+static int ina2xx_total_average_factor_index = INA226_AVERAGING_FACTOR_INDEX_DEFAULT;
+
+static int ina226_calc_interval(u16 config)
 {
-	int avg = ina226_avg_tab[INA226_READ_AVG(config)];
-
 	/*
 	 * Multiply the total conversion time by the number of averages.
-	 * Return the result in milliseconds.
+	* Return the result in microseconds.
 	 */
-	return DIV_ROUND_CLOSEST(avg * INA226_TOTAL_CONV_TIME_DEFAULT, 1000);
-}
-
-/*
- * Return the new, shifted AVG field value of CONFIG register,
- * to use with regmap_update_bits
- */
-static u16 ina226_interval_to_reg(int interval)
-{
-	int avg, avg_bits;
-
-	avg = DIV_ROUND_CLOSEST(interval * 1000,
-				INA226_TOTAL_CONV_TIME_DEFAULT);
-	avg_bits =
-		find_closest(avg, ina226_avg_tab, ARRAY_SIZE(ina226_avg_tab));
-
-	return INA226_SHIFT_AVG(avg_bits);
+	return 2 * ina226_avg_tab[ina2xx_total_average_factor_index] * ina226_conv_time_tab[ina2xx_total_conv_time_index];
 }
 
 /*
@@ -208,29 +195,24 @@ static int ina226_conversion_time_write(struct ina2xx_precise_data *data)
 
 	status = regmap_update_bits(
 		data->regmap, INA2XX_CONFIG, INA226_BUS_CONVERSION_TIME_MASK,
-		INA226_SHIFT_BUS_CONV_TIME(
-			INA226_TOTAL_CONV_TIME_REG_VALUE_DEFAULT));
+		INA226_SHIFT_BUS_CONV_TIME(ina2xx_total_conv_time_index));
 	if (status < 0)
 		return status;
 
 	status = regmap_update_bits(
 		data->regmap, INA2XX_CONFIG, INA226_SHUNT_CONVERSION_TIME_MASK,
-		INA226_SHIFT_SHUNT_CONV_TIME(
-			INA226_TOTAL_CONV_TIME_REG_VALUE_DEFAULT));
+		INA226_SHIFT_SHUNT_CONV_TIME(ina2xx_total_conv_time_index));
 
 	return status;
 }
 
 static int ina226_averaging_factor_write(struct ina2xx_precise_data *data)
 {
-	int status, avg_bits;
-
-	avg_bits = find_closest(INA226_AVERAGING_FACTOR_DEFAULT, ina226_avg_tab,
-				ARRAY_SIZE(ina226_avg_tab));
+	int status;
 
 	status = regmap_update_bits(data->regmap, INA2XX_CONFIG,
 				    INA226_AVG_RD_MASK,
-				    INA226_SHIFT_AVG(avg_bits));
+				    INA226_SHIFT_AVG(ina2xx_total_average_factor_index));
 
 	return status;
 }
@@ -635,31 +617,7 @@ static ssize_t ina2xx_precise_max_current_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%lu\n", data->max_current_mA);
 }
 
-static ssize_t ina226_interval_store(struct device *dev,
-				     struct device_attribute *da,
-				     const char *buf, size_t count)
-{
-	struct ina2xx_precise_data *data = dev_get_drvdata(dev);
-	unsigned long val;
-	int status;
-
-	status = kstrtoul(buf, 10, &val);
-	if (status < 0)
-		return status;
-
-	if (val > INT_MAX || val == 0)
-		return -EINVAL;
-
-	status = regmap_update_bits(data->regmap, INA2XX_CONFIG,
-				    INA226_AVG_RD_MASK,
-				    ina226_interval_to_reg(val));
-	if (status < 0)
-		return status;
-
-	return count;
-}
-
-static ssize_t ina226_interval_show(struct device *dev,
+static ssize_t ina2xx_interval_show(struct device *dev,
 				    struct device_attribute *da, char *buf)
 {
 	struct ina2xx_precise_data *data = dev_get_drvdata(dev);
@@ -670,7 +628,73 @@ static ssize_t ina226_interval_show(struct device *dev,
 	if (status)
 		return status;
 
-	return sysfs_emit(buf, "%d\n", ina226_reg_to_interval(regval));
+	return sysfs_emit(buf, "%d\n", ina226_calc_interval(regval));
+}
+
+static ssize_t ina2xx_total_conv_time_show(struct device *dev,
+						struct device_attribute *da, char *buf)
+{
+	return sysfs_emit(buf, "%d\n", ina226_conv_time_tab[ina2xx_total_conv_time_index]);
+}
+
+static ssize_t ina2xx_total_conv_time_store(struct device *dev,
+						 struct device_attribute *da,
+						 const char *buf, size_t count)
+{
+	struct ina2xx_precise_data *data = dev_get_drvdata(dev);
+	unsigned long val;
+	int status;
+	int i;
+	status = kstrtoul(buf, 10, &val);
+	if (status < 0)
+		return status;
+
+	for (i = 0; i < ARRAY_SIZE(ina226_conv_time_tab); i++) {
+		if (val == ina226_conv_time_tab[i]) {
+			break;
+		}
+	}
+
+	if (i == ARRAY_SIZE(ina226_conv_time_tab)) {
+		return -EINVAL;
+	}
+
+	ina2xx_total_conv_time_index = i;
+	ina226_conversion_time_write(data);
+	return count;
+}
+
+static ssize_t ina2xx_total_average_factor_show(struct device *dev,
+						struct device_attribute *da, char *buf)
+{
+	return sysfs_emit(buf, "%d\n", ina226_avg_tab[ina2xx_total_average_factor_index]);
+}
+
+static ssize_t ina2xx_total_average_factor_store(struct device *dev,
+						 struct device_attribute *da,
+						 const char *buf, size_t count)
+{
+	struct ina2xx_precise_data *data = dev_get_drvdata(dev);
+	unsigned long val;
+	int status;
+	int i;
+	status = kstrtoul(buf, 10, &val);
+	if (status < 0)
+		return status;
+	
+	for (i = 0; i < ARRAY_SIZE(ina226_avg_tab); i++) {
+		if (val == ina226_avg_tab[i]) {
+			break;
+		}
+	}
+
+	if (i == ARRAY_SIZE(ina226_avg_tab)) {
+		return -EINVAL;
+	}
+
+	ina2xx_total_average_factor_index = i;
+	ina226_averaging_factor_write(data);
+	return count;
 }
 
 /* shunt voltage */
@@ -714,7 +738,11 @@ static SENSOR_DEVICE_ATTR_RO(power1_crit_alarm, ina226_alarm,
 static SENSOR_DEVICE_ATTR_RO(shunt_resistor, ina2xx_precise_shunt,
 			     INA2XX_CALIBRATION);
 
-static SENSOR_DEVICE_ATTR_RW(update_interval, ina226_interval, 0);
+static SENSOR_DEVICE_ATTR_RO(update_interval_us, ina2xx_interval, 0);
+
+static SENSOR_DEVICE_ATTR_RW(total_conv_time_us,  ina2xx_total_conv_time, 0);
+
+static SENSOR_DEVICE_ATTR_RW(total_average_factor, ina2xx_total_average_factor, 0);
 
 /* max_current_mA */
 static SENSOR_DEVICE_ATTR_RO(max_current_mA, ina2xx_precise_max_current, 0);
@@ -737,7 +765,9 @@ static struct attribute *ina2xx_precise_attrs[] = {
 	&sensor_dev_attr_in1_lcrit_alarm.dev_attr.attr,
 	&sensor_dev_attr_power1_crit.dev_attr.attr,
 	&sensor_dev_attr_power1_crit_alarm.dev_attr.attr,
-	&sensor_dev_attr_update_interval.dev_attr.attr,
+	&sensor_dev_attr_update_interval_us.dev_attr.attr,
+	&sensor_dev_attr_total_conv_time_us.dev_attr.attr,
+	&sensor_dev_attr_total_average_factor.dev_attr.attr,
 	NULL,
 };
 

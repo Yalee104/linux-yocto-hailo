@@ -18,7 +18,8 @@ enum hailo15_video_path {
 
 #define HAILO15_MAX_BUFFERS 10
 #define HAILO15_NUM_P2A_BUFFERS 1
-#define HAILO15_EVENT_RESOURCE_SIZE 4096 * 4
+#define HAILO15_EVENT_RESOURCE_DATA_SIZE (4096 * 4)
+#define HAILO15_EVENT_RESOURCE_MAX_MAP_SIZE  (HAILO15_EVENT_RESOURCE_DATA_SIZE + PAGE_SIZE)
 
 #define VIDEO_FPS_MONITOR_SUBDEV_IOC    _IOR('D', BASE_VIDIOC_PRIVATE + 0, uint64_t)
 #define VIDEO_GET_VSM_IOC               _IOWR('D', BASE_VIDIOC_PRIVATE + 1, struct hailo15_get_vsm_params)
@@ -38,6 +39,7 @@ enum hailo15_video_path {
 #define ISPIOC_V4L2_REQBUFS             _IOWR('I', BASE_VIDIOC_PRIVATE + 8, struct hailo15_reqbufs)
 #define ISPIOC_V4L2_SET_INPUT_FORMAT    _IOWR('I', BASE_VIDIOC_PRIVATE + 9, struct v4l2_subdev_format)
 #define ISPIOC_V4L2_SET_MCM_MODE        _IOWR('I', BASE_VIDIOC_PRIVATE + 10, uint32_t)
+#define ISPIOC_V4L2_GET_NULL_ADDR       _IOR('I', BASE_VIDIOC_PRIVATE + 11, uint32_t)
 
 #define HAILO15_PAD_REQBUFS             _IOWR('V', BASE_VIDIOC_PRIVATE + 9, struct hailo15_reqbufs)
 #define HAILO15_PAD_BUF_DONE            _IOWR('V', BASE_VIDIOC_PRIVATE + 10, struct hailo15_pad_buf)

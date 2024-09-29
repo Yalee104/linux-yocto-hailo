@@ -100,7 +100,7 @@ int hailo15_video_post_event(struct video_device *vdev,
 		cur_complete = event_shm->complete;
 
 		if (data) {
-			if (data_size > 0 && data_size <= HAILO15_EVENT_RESOURCE_SIZE) {
+			if (data_size > 0 && data_size <= HAILO15_EVENT_RESOURCE_DATA_SIZE) {
 				memset(event_shm, 0, event_resource->size);
 				event_shm->complete = cur_complete;
 				event_data->data_size = data_size;

@@ -19,13 +19,14 @@
     
     sensor_0: camera-sensor@1a {
         status = "ok";
-        compatible = "sony,imx334", "sony,imx675", "sony,imx678";
+        compatible = "sony,imx334", "sony,imx675", "sony,imx678", "sony,imx715";
         reg = <0x1a>;
         clocks = <&sensor_clk>;
         clock-names = "inclk";
         clock-frequency = <24000000>;
         csi-id = <0>;
         reset-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+        xmaster-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
         port {
             sensor_out_csi2rx: endpoint {
                 data-lanes = <1 2 3 4>;
@@ -120,11 +121,11 @@
 };
 
 &xrp {
-    status = "ok";
+    status = "okay";
 };
 
 &xrp_reserved {
-    status = "ok";
+    status = "okay";
 };
 
 &sdio1 {
@@ -233,8 +234,32 @@
 
 &i2c_2 {
     status = "ok";
+    clock-frequency = <400000>;
     pinctrl-names = "default";
-    pinctrl-0 = <&pinctrl_i2c2>, <&pinctrl_i2c2_current_src_en_out>;
+    pinctrl-0 = <&pinctrl_i2c2>;
+    gyro_lsm6dsr_2: lsm6dsr_2@6b {
+        status = "disabled";
+        compatible = "st,lsm6dsr";
+        reg = <0x6b>;
+        vdd-supply = <&regulator_1p8v>;
+        vddio-supply = <&regulator_1p8v>;
+        interrupt-parent = <&gpio1>;
+        interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_gpio21>;
+    };
+
+    gyro_icm42670_2: icm42670_2@69 {
+        status = "disabled";
+        compatible = "invensense,icm42670";
+        reg = <0x69>;
+        vdd-supply = <&regulator_1p8v>;
+        vddio-supply = <&regulator_1p8v>;
+        interrupt-parent = <&gpio1>;
+        interrupts = <5 IRQ_TYPE_EDGE_RISING>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_gpio21>;
+	};
 };
 
 &pinctrl {
@@ -303,50 +328,34 @@
         function = "usb_drive_vbus_out";
         groups = "usb_drive_vbus_out_2_grp";
     };
+
+    pinctrl_gpio21: gpio21 {
+        function = "gpio";
+        groups = "gpio21_grp";
+    };
 };
+
+#define GPIO_LINE_NAMES \
+    "SPI_CS2",                  "SPI_CS2",                  "DSI_RST",                  "CAM_TRIG", \
+    "cam0_reset_n",             "cam1_reset_n",             "gpio_in_out_6",            "gpio_in_out_7", \
+    "gpio_in_out_8",            "sdio0_gp_in",              "sdio0_cd_in",              "usb_overcurrent_n_in", \
+    "usb_drive_vbus_out",       "sdio1_gp_in",              "sdio1_cd_in_n",            "RVSD", \
+    \
+    "gpio_in_out_16",           "WiFi_BT_disable_n",        "timer_ext_in0",            "timer_ext_in1", \
+    "shut_down_out",            "user_LED",                 "i2c2_sda_in_out",          "i2c2_scl_out", \
+    "i2c2_current_src_en_out",  "i2c0_current_src_en_out",  "i2c1_current_src_en_out",  "gpio_in_out_27", \
+    "gpio_in_out_28",           "DSI_INTR",                 "uart0_cts_pad_in",         "uart0_rts_pad_out"
 
 &gpio0 {
     gpio-ranges = <&pinctrl 0 0 16>;
 
-    gpio-line-names =
-        "SPI_CS2",
-        "SPI_CS2",
-        "DSI_RST",
-        "CAM_TRIG",
-        "cam0_reset_n",
-        "cam1_reset_n",
-        "gpio_in_out_6",
-        "gpio_in_out_7",
-        "gpio_in_out_8",
-        "sdio0_gp_in",
-        "sdio0_cd_in",
-        "usb_overcurrent_n_in",
-        "usb_drive_vbus_out",
-        "sdio1_gp_in",
-        "sdio1_cd_in_n",
-        "RVSD";
+    gpio-line-names = GPIO_LINE_NAMES;
 };
 
 &gpio1 {
     gpio-ranges = <&pinctrl 0 16 16>;
 
-    gpio-line-names =
-        "gpio_in_out_16",
-        "WiFi_BT_disable_n",
-        "timer_ext_in0",
-        "timer_ext_in1",
-        "shut_down_out",
-        "user_LED",
-        "i2c2_sda_in_out",
-        "i2c2_scl_out",
-        "i2c2_current_src_en_out",
-        "i2c0_current_src_en_out",
-        "i2c1_current_src_en_out",
-        "gpio_in_out_27",
-        "gpio_in_out_28",
-        "DSI_INTR",
-        "uart0_cts_pad_in",
-        "uart0_rts_pad_out";
+    gpio-line-names = GPIO_LINE_NAMES;
 
     pin_WiFi_BT_disable_n {
         gpio-hog;
@@ -363,8 +372,14 @@
     };
 };
 
-&torrent_phy {
+&hailo_torrent_phy {
     status = "okay";
+    usb-lane = <3>;
+    usb-lane-pma-pll-full-rate-divider = <PCI_PMA_PLL_FULL_RATE_CLK_DIVIDER_4>;
+    lanes-config = <PCI_PHY_LINK_LANES_CFG__2x1_PLUS_1x2__MASTER_LANES_LN0_LN2_LN3>;
+};
+
+&cdns_torrent_phy {
     torrent_phy_pcie: phy@0 {
         reg = <0>;
         resets = <&scmi_reset HAILO15_SCMI_RESET_IDX_PCIE_PHY_LANE_0>, <&scmi_reset HAILO15_SCMI_RESET_IDX_PCIE_PHY_LANE_1>;
@@ -382,8 +397,11 @@
     };
 };
 
-&usb3 {
+&hailo_usb3 {
     status = "okay";
+};
+
+&cdns_usb3 {
     dr_mode = "host";
     phys = <&torrent_phy_usb3>;
     phy-names = "cdns3,usb3-phy";

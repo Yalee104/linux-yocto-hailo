@@ -262,6 +262,7 @@ struct imx678 {
 	struct v4l2_subdev sd;
 	struct media_pad pad;
 	struct gpio_desc *reset_gpio;
+	struct gpio_desc *xmaster_gpio;
 	struct clk *inclk;
 	struct v4l2_ctrl_handler ctrl_handler;
 	struct v4l2_ctrl *link_freq_ctrl;
@@ -3353,6 +3354,12 @@ static int imx678_set_pad_format(struct v4l2_subdev *sd,
 	const struct imx678_mode *mode;
 	int ret = 0;
 	mutex_lock(&imx678->mutex);
+
+	if (imx678->streaming) {
+		dev_err(imx678->dev,
+			"Cannot set pad format while streaming\n");
+		return -EINVAL;
+	}
 	
 	ret = imx678_get_fmt_mode(imx678, fmt, &mode);
 	if(ret){
@@ -3390,6 +3397,9 @@ static int imx678_init_pad_cfg(struct v4l2_subdev *sd,
 	struct imx678_mode *supported_modes;
 	struct imx678 *imx678 = to_imx678(sd);
 	struct v4l2_subdev_format fmt = { 0 };
+
+	if (imx678->streaming)
+		return 0;
 
 	if (imx678->hdr_enabled)
 		supported_modes = (struct imx678_mode *)supported_hdr_modes;
@@ -3665,6 +3675,14 @@ static int imx678_parse_hw_config(struct imx678 *imx678)
 		dev_err(imx678->dev, "failed to get reset gpio %ld",
 			PTR_ERR(imx678->reset_gpio));
 		return PTR_ERR(imx678->reset_gpio);
+	}
+
+	imx678->xmaster_gpio =
+		devm_gpiod_get_optional(imx678->dev, "xmaster", GPIOD_OUT_LOW);
+	if (IS_ERR(imx678->xmaster_gpio)) {
+		dev_err(imx678->dev, "failed to get xmaster gpio %ld",
+			PTR_ERR(imx678->xmaster_gpio));
+		return PTR_ERR(imx678->xmaster_gpio);
 	}
 
 	/* Get sensor input clock */

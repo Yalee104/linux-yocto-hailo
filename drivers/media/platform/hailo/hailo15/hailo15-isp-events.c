@@ -103,7 +103,7 @@ int hailo15_isp_post_event(struct video_device *vdev,
 		cur_complete = event_shm->complete;
 
 		if (data) {
-			if (data_size == 0 || data_size > HAILO15_EVENT_RESOURCE_SIZE) {
+			if (data_size == 0 || data_size > HAILO15_EVENT_RESOURCE_DATA_SIZE) {
 				pr_err("%s - got data with bad data size: %ld\n", __func__, data_size);
 				mutex_unlock(&event_resource->event_lock);
 				return -EINVAL;

@@ -64,6 +64,7 @@
 #define HAILO15_ISP_CID_GC_B_X_DISTANCE (HAILO15_ISP_CID_GC_BASE + 0x0007)
 #define HAILO15_ISP_CID_GC_B_X_DATA (HAILO15_ISP_CID_GC_BASE + 0x0008)
 #define HAILO15_ISP_CID_GC_B_Y_DATA (HAILO15_ISP_CID_GC_BASE + 0x0009)
+#define HAILO15_ISP_CID_GC_MODE (HAILO15_ISP_CID_GC_BASE + 0x000A)
 
 int hailo15_isp_gcv2_ctrl_count(void);
 int hailo15_isp_gcv2_ctrl_create(struct hailo15_isp_device *isp_dev);

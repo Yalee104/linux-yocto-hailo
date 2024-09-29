@@ -35,7 +35,7 @@
 		.urgency = 0, \
 	}
 
-#define DEFAULT_PARAMS ((struct scmi_hailo_ddr_start_measure_a2p) { \
+#define DEFAULT_PARAMS ((struct scmi_hailo_noc_start_measure_a2p) { \
 		.sample_time_us = DEFAULT_SAMPLE_TIME_US, \
 		.after_trigger_percentage = 50, \
 		.is_freerunning = false, \
@@ -81,7 +81,7 @@ struct indexed_device_attribute {
 #define INDEXED_DEVICE_ATTR_ADMIN_RW(_name, _category, _index) \
 	struct indexed_device_attribute dev_attr_##_name##_##_category##_index = __INDEXED_ATTR_RW_MODE(_name, _category, 0600, _index)
 
-struct ddr_sample {
+struct noc_sample {
 	uint32_t noc_counters[4];
 	uint32_t dsm_rx_counter;
 	uint32_t dsm_tx_counter;
@@ -98,7 +98,7 @@ enum action_id {
 
 struct action {
 	enum action_id action_id;
-	struct scmi_hailo_ddr_start_measure_a2p action_param;
+	struct scmi_hailo_noc_start_measure_a2p action_param;
 };
 
 struct hailo_pmu {
@@ -106,7 +106,7 @@ struct hailo_pmu {
 	struct perf_event *event;
 	struct platform_device *pdev;
 	struct perf_output_handle handle;
-	struct ddr_sample *scu_buf;
+	struct noc_sample *scu_buf;
 	void *aux_buf;
 	size_t aux_buf_remaining_size;
 	size_t remaining_samples;
@@ -116,7 +116,7 @@ struct hailo_pmu {
 	bool active;
 
 	struct action action;
-	struct scmi_hailo_ddr_start_measure_a2p params;
+	struct scmi_hailo_noc_start_measure_a2p params;
 	bool active_counters[4];
 
 	/*
@@ -244,7 +244,7 @@ static inline void hailo_pmu_start_measure_failed(struct hailo_pmu *hailo_pmu)
 	hailo_pmu_unlock(hailo_pmu);
 }
 
-static void hailo_pmu_get_action(struct hailo_pmu *hailo_pmu, enum action_id *action_id, struct scmi_hailo_ddr_start_measure_a2p *params)
+static void hailo_pmu_get_action(struct hailo_pmu *hailo_pmu, enum action_id *action_id, struct scmi_hailo_noc_start_measure_a2p *params)
 {
 	hailo_pmu_lock(hailo_pmu);
 	*action_id = hailo_pmu->action.action_id;
@@ -260,7 +260,7 @@ static DECLARE_WAIT_QUEUE_HEAD(hailo_pmu_action_queue);
 
 
 /* Assumed to be under lock */
-static void hailo_pmu_set_action(struct hailo_pmu *hailo_pmu, enum action_id action_id, struct scmi_hailo_ddr_start_measure_a2p *params)
+static void hailo_pmu_set_action(struct hailo_pmu *hailo_pmu, enum action_id action_id, struct scmi_hailo_noc_start_measure_a2p *params)
 {
 	int i;
 
@@ -299,7 +299,7 @@ static int hailo_pmu_commands_sender(void *data)
 	int ret = 0;
 	struct hailo_pmu *hailo_pmu = data;
 	enum action_id action_id;
-	struct scmi_hailo_ddr_start_measure_a2p params;
+	struct scmi_hailo_noc_start_measure_a2p params;
 	bool measurement_was_running;
 
 	hailo_pmu->active = true;
@@ -314,14 +314,14 @@ static int hailo_pmu_commands_sender(void *data)
 				ret = hailo_pmu->scmi_ops->start_measure(&params);
 				if (ret) {
 					hailo_pmu_start_measure_failed(hailo_pmu);
-					pr_err("Failed to start DDR bandwidth measurement on rc: %d\n", ret);
+					pr_err("Failed to start NoC bandwidth measurement on rc: %d\n", ret);
 					break;
 				}
 				break;
 			case ACTION_STOP:
 				ret = hailo_pmu->scmi_ops->stop_measure(&measurement_was_running);
 				if (ret) {
-					pr_err("Failed to stop DDR bandwidth measurement on rc: %d\n", ret);
+					pr_err("Failed to stop NoC bandwidth measurement on rc: %d\n", ret);
 					break;
 				}
 				/*
@@ -362,7 +362,7 @@ static int hailo_pmu_add(struct perf_event *event, int flags)
 	if (hailo_pmu->remaining_samples == 0) {
 		/* If user did not limit the number of samples,
 		   use the size of aux_buf as the limit. */
-		hailo_pmu->remaining_samples = hailo_pmu->aux_buf_remaining_size / sizeof(struct ddr_sample);
+		hailo_pmu->remaining_samples = hailo_pmu->aux_buf_remaining_size / sizeof(struct noc_sample);
 	}
 
 	hailo_pmu_set_action(hailo_pmu, ACTION_START, &hailo_pmu->params);
@@ -440,7 +440,7 @@ static ssize_t hailo_pmu_sysfs_show(struct device *dev, struct device_attribute 
 	PMU_EVENT_ATTR_ID(_name, hailo_pmu_sysfs_show, _config)
 
 static struct attribute *hailo_pmu_event_attrs[] = {
-	HAILO_PMU_EVENT_ATTR(hailo_ddr_bw, 0),
+	HAILO_PMU_EVENT_ATTR(hailo_noc_bw, 0),
 	NULL,
 };
 
@@ -485,7 +485,7 @@ static int get_attribute_index(struct device_attribute *attr)
 	return index;
 }
 
-static struct scmi_hailo_ddr_start_measure_a2p_filter *get_filter(struct device *dev, struct device_attribute *attr)
+static struct scmi_hailo_noc_start_measure_a2p_filter *get_filter(struct device *dev, struct device_attribute *attr)
 {
 	struct hailo_pmu *pmu = dev_get_drvdata(dev);
 	return &pmu->params.filters[get_attribute_index(attr)];
@@ -563,7 +563,7 @@ static int hailo_pmu_event_init(struct perf_event *event)
 static ssize_t mode_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	if (filter->total)
 		return sprintf(buf, "total\n");
@@ -573,7 +573,7 @@ static ssize_t mode_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	/* sizeof - 1 to ignore last character (in case it is '\n') */
 	if (strncmp(buf, "total", sizeof("total") - 1) == 0) {
@@ -593,7 +593,7 @@ NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(mode);
 static ssize_t route_id_base_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%08x\n", filter->routeidbase);
 }
@@ -601,7 +601,7 @@ static ssize_t route_id_base_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u32 val;
 
 	if (kstrtou32(buf, 0, &val))
@@ -617,7 +617,7 @@ NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(route_id_base);
 static ssize_t route_id_mask_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%08x\n", filter->routeidmask);
 }
@@ -625,7 +625,7 @@ static ssize_t route_id_mask_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u32 val;
 
 	if (kstrtou32(buf, 0, &val))
@@ -641,7 +641,7 @@ NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(route_id_mask);
 static ssize_t opcode_noc_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%02x\n", filter->opcode);
 }
@@ -649,7 +649,7 @@ static ssize_t opcode_noc_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u8 val;
 
 	if (kstrtou8(buf, 0, &val))
@@ -668,7 +668,7 @@ NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(opcode);
 static ssize_t length_noc_show(struct device *dev,
 			   struct device_attribute *attr, char *buf)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%02x\n", filter->length);
 }
@@ -676,7 +676,7 @@ static ssize_t length_noc_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u8 val;
 
 	if (kstrtou8(buf, 0, &val))
@@ -695,7 +695,7 @@ NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(length);
 static ssize_t address_base_noc_show(struct device *dev,
 				 struct device_attribute *attr, char *buf)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u64 address_base = filter->addrbase_low +
 		((u64)filter->addrbase_high << 32);
 
@@ -705,7 +705,7 @@ static ssize_t address_base_noc_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u64 address_base;
 
 	if (kstrtou64(buf, 0, &address_base))
@@ -723,7 +723,7 @@ NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(address_base);
 static ssize_t window_size_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "0x%02x\n", filter->window_size);
 }
@@ -731,7 +731,7 @@ static ssize_t window_size_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u8 val;
 
 	if (kstrtou8(buf, 0, &val))
@@ -749,7 +749,7 @@ NOC_COUNTERS_INDEXED_DEVICE_ATTR_ADMIN_RW(window_size);
 static ssize_t urgency_noc_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 
 	return sprintf(buf, "%x\n", filter->urgency);
 }
@@ -757,7 +757,7 @@ static ssize_t urgency_noc_store(struct device *dev,
 				 struct device_attribute *attr,
 				 const char *buf, size_t count)
 {
-	struct scmi_hailo_ddr_start_measure_a2p_filter *filter = get_filter(dev, attr);
+	struct scmi_hailo_noc_start_measure_a2p_filter *filter = get_filter(dev, attr);
 	u8 val;
 
 	if (kstrtou8(buf, 0, &val))
@@ -935,7 +935,7 @@ static int hailo_pmu_register_perf(struct hailo_pmu *hailo_pmu)
 		.task_ctx_nr = perf_invalid_context
 	};
 
-	ret = perf_pmu_register(&hailo_pmu->pmu, "hailo_ddr_pmu", -1);
+	ret = perf_pmu_register(&hailo_pmu->pmu, "hailo_noc_pmu", -1);
 
 	return ret;
 }
@@ -958,7 +958,7 @@ struct contexted_notifier_block trigger_nb = {
 
 static int hailo_pmu_ended_notifier(struct notifier_block *nb, unsigned long event, void *data)
 {
-	struct scmi_hailo_ddr_measurement_ended_notification *report;
+	struct scmi_hailo_noc_measurement_ended_notification *report;
 	struct hailo_pmu *hailo_pmu;
 	bool allowed;
 
@@ -976,7 +976,7 @@ static int hailo_pmu_ended_notifier(struct notifier_block *nb, unsigned long eve
 	}
 
 	number_of_samples = (report->sample_end_index - report->sample_start_index + 1);
-	number_of_samples_fit_in_aux_buf = hailo_pmu->aux_buf_remaining_size / sizeof(struct ddr_sample);
+	number_of_samples_fit_in_aux_buf = hailo_pmu->aux_buf_remaining_size / sizeof(struct noc_sample);
 
 	/*
 	 * In case we received more samples than the user requested,
@@ -993,7 +993,7 @@ static int hailo_pmu_ended_notifier(struct notifier_block *nb, unsigned long eve
 		number_of_samples = number_of_samples_fit_in_aux_buf;
 	}
 
-	samples_size = number_of_samples * sizeof(struct ddr_sample);
+	samples_size = number_of_samples * sizeof(struct noc_sample);
 
 	/* Copy the samples to the aux buffer and update current state */
 	memcpy_fromio(hailo_pmu->aux_buf, &hailo_pmu->scu_buf[report->sample_start_index], samples_size);
@@ -1004,7 +1004,7 @@ static int hailo_pmu_ended_notifier(struct notifier_block *nb, unsigned long eve
 	hailo_pmu->aux_buf = ((uint8_t *)hailo_pmu->aux_buf) + samples_size;
 
 	/* Check if we should stop capturing */
-	if (hailo_pmu->remaining_samples == 0 || hailo_pmu->aux_buf_remaining_size < sizeof(struct ddr_sample))  {
+	if (hailo_pmu->remaining_samples == 0 || hailo_pmu->aux_buf_remaining_size < sizeof(struct noc_sample))  {
 		goto Exit;
 	}
 
@@ -1028,12 +1028,12 @@ static int hailo_pmu_register_notifiers(struct hailo_pmu *hailo_pmu)
 	int ret;
 
 	trigger_nb.context = hailo_pmu;
-	ret = hailo_pmu->scmi_ops->register_notifier(SCMI_HAILO_DDR_MEASUREMENT_TRIGGER_NOTIFICATION_ID, &trigger_nb.notifier_block);
+	ret = hailo_pmu->scmi_ops->register_notifier(SCMI_HAILO_NOC_MEASUREMENT_TRIGGER_NOTIFICATION_ID, &trigger_nb.notifier_block);
 	if (ret)
 		return ret;
 
 	ended_nb.context = hailo_pmu;
-	ret = hailo_pmu->scmi_ops->register_notifier(SCMI_HAILO_DDR_MEASUREMENT_ENDED_NOTIFICATION_ID, &ended_nb.notifier_block);
+	ret = hailo_pmu->scmi_ops->register_notifier(SCMI_HAILO_NOC_MEASUREMENT_ENDED_NOTIFICATION_ID, &ended_nb.notifier_block);
 	if (ret)
 		return ret;
 
@@ -1080,7 +1080,7 @@ static int hailo_pmu_probe(struct platform_device *pdev)
 	}
 
 	/* Remap SCU shared buffer */
-	hailo_pmu->scu_buf = devm_platform_ioremap_resource_byname(pdev, "ddr_pmu_samples");
+	hailo_pmu->scu_buf = devm_platform_ioremap_resource_byname(pdev, "noc_pmu_samples");
 	if (IS_ERR(hailo_pmu->scu_buf)) {
 		pr_err("Failed to remap SCU buffer: %ld\n", PTR_ERR(hailo_pmu->scu_buf));
 		return PTR_ERR(hailo_pmu->scu_buf);
@@ -1109,23 +1109,23 @@ static int hailo_pmu_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static const struct of_device_id hailo_ddr_pmu_dt_ids[] = {
-	{ .compatible = "hailo,ddr-pmu"},
+static const struct of_device_id hailo_noc_pmu_dt_ids[] = {
+	{ .compatible = "hailo,noc-pmu"},
 	{ /* sentinel */ }
 };
-MODULE_DEVICE_TABLE(of, hailo_ddr_pmu_dt_ids);
+MODULE_DEVICE_TABLE(of, hailo_noc_pmu_dt_ids);
 
-static struct platform_driver hailo_ddr_pmu_driver = {
+static struct platform_driver hailo_noc_pmu_driver = {
 	.driver = {
-		.name   = "hailo-ddr-pmu",
-		.of_match_table = hailo_ddr_pmu_dt_ids,
+		.name   = "hailo-noc-pmu",
+		.of_match_table = hailo_noc_pmu_dt_ids,
 		.suppress_bind_attrs = true,
 	},
 	.probe  = hailo_pmu_probe,
 	.remove = hailo_pmu_remove,
 };
 
-module_platform_driver(hailo_ddr_pmu_driver);
+module_platform_driver(hailo_noc_pmu_driver);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Hailo PMU driver");

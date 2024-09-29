@@ -70,7 +70,6 @@ struct cmsdk_gpio {
 
 	struct gpio_chip gc;
 	struct irq_chip irq_chip;
-	unsigned int gpio_index_module_offset;
 
 	struct irq_domain *irq_domain;
 };
@@ -334,7 +333,7 @@ static irqreturn_t cmsdk_irq_handler(int irq __maybe_unused, void *dev_id)
 		return IRQ_NONE;
 
 	writew(status, &CMSDK_GPIO_REGS->INTCLEAR);
-	writel(status << gpio->gpio_index_module_offset, &GPIO_MANAGER_CONFIG_REGS->gpio_int_w1c);
+	writel(status << gpio->gc.offset, &GPIO_MANAGER_CONFIG_REGS->gpio_int_w1c);
 
 	for_each_set_bit(i, &status, gpio->gc.ngpio) {
 		unsigned int irq;
@@ -360,7 +359,7 @@ static void disable_gpio_irqs(struct cmsdk_gpio *cmsdk_gpio)
 		((GPIO_MANAGER_CONFIG_t *)cmsdk_gpio->config);
 
 	writew(0xFFFF, &CMSDK_GPIO_REGS->INTCLEAR);
-	writel(0xFFFF << cmsdk_gpio->gpio_index_module_offset, &GPIO_MANAGER_CONFIG_REGS->gpio_int_w1c);
+	writel(0xFFFF << cmsdk_gpio->gc.offset, &GPIO_MANAGER_CONFIG_REGS->gpio_int_w1c);
 	writew(0xFFFF, &CMSDK_GPIO_REGS->INTENCLR);
 }
 
@@ -492,11 +491,12 @@ static int cmsdk_gpio_probe(struct platform_device *pdev)
 	}
 
 	if (of_property_read_u32(pdev->dev.of_node, "cmsdk_gpio,gpio-offset",
-				 &cmsdk_gpio->gpio_index_module_offset)) {
+				 &reg)) {
 		dev_err(&pdev->dev, "Error getting gpio-offset\n");
 		return -ENODEV;
 	}
 
+	cmsdk_gpio->gc.offset = reg;
 	cmsdk_gpio->gc.request = gpiochip_generic_request;
 	cmsdk_gpio->gc.free = gpiochip_generic_free;
 	cmsdk_gpio->gc.base = -1;

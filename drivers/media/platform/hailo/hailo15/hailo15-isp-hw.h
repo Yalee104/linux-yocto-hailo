@@ -105,11 +105,27 @@
 #define MI_MCM_DMA_RAW_PIC_LVAL 0x1690
 #define MI_MCM_DMA_RAW_PIC_SIZE 0x1678
 #define MCM_RD_CFG 0x1280
-#define MCM_RD_FMT 5
 #define MI_MCM_FMT 0X1604
 #define MCM_RD_RAW_BIT 4
 #define MI_IMSC 0x16C0
 #define MCM_DMA_RAW_READY BIT(24)
+
+enum mcm_rd_fmt {
+    MCM_RD_FMT_8BIT = 0,
+    MCM_RD_FMT_10BIT = 1,
+    MCM_RD_FMT_12BIT = 2,
+    MCM_RD_FMT_14BIT = 3,
+    MCM_RD_FMT_16BIT = 4,
+    MCM_RD_FMT_20BIT = 5,
+    MCM_RD_FMT_INVALID
+};
+
+enum isp_mcm_mode {
+    ISP_MCM_MODE_OFF = 0,
+    ISP_MCM_MODE_STITCHING,
+    ISP_MCM_MODE_INJECTION,
+    ISP_MCM_MODE_MAX
+};
 
 /*AF Measurments*/
 #define ISP_AFM_SUM_A 0x2024

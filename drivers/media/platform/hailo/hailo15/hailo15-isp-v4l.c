@@ -20,6 +20,7 @@
 #include <stdbool.h>
 #include "hailo15-isp.h"
 #include "hailo15-isp-hw.h"
+#include "hailo15-isp-events.h"
 #include "hailo15-media.h"
 #include "common.h"
 
@@ -453,6 +454,10 @@ static long hailo15_vsi_isp_priv_ioctl(struct v4l2_subdev *sd, unsigned int cmd,
 			   sizeof(struct v4l2_subdev_format));
 		ret = 0;
 		break;
+	case ISPIOC_V4L2_GET_NULL_ADDR:
+		*((uint32_t*)arg) = isp_dev->null_addr;
+		ret = 0;
+		break;
 	case ISPIOC_S_MIV_INFO:
 	case ISPIOC_S_MIS_IRQADDR:
 	case ISPIOC_S_MP_34BIT:
@@ -505,15 +510,17 @@ static long hailo15_vsi_isp_priv_ioctl(struct v4l2_subdev *sd, unsigned int cmd,
 
 static int hailo15_vsi_isp_init_events(struct hailo15_isp_device *isp_dev)
 {
+	size_t size = HAILO15_EVENT_RESOURCE_DATA_SIZE + offsetof(struct hailo15_isp_event_pkg, data);
+	size_t size_page_align = PAGE_ALIGN(size);
+
 	mutex_init(&isp_dev->event_resource.event_lock);
-	isp_dev->event_resource.virt_addr =
-		kmalloc(HAILO15_EVENT_RESOURCE_SIZE, GFP_KERNEL);
+	isp_dev->event_resource.virt_addr = kmalloc(size_page_align, GFP_KERNEL);
 	if (!isp_dev->event_resource.virt_addr)
 		return -ENOMEM;
 
 	isp_dev->event_resource.phy_addr =
 		virt_to_phys(isp_dev->event_resource.virt_addr);
-	isp_dev->event_resource.size = HAILO15_EVENT_RESOURCE_SIZE;
+	isp_dev->event_resource.size = size;
 	memset(isp_dev->event_resource.virt_addr, 0,
 		   isp_dev->event_resource.size);
 	return 0;
@@ -1226,6 +1233,22 @@ hailo15_isp_destroy_media_pads(struct hailo15_isp_device *isp_dev)
 	hailo15_media_entity_clean(&isp_dev->sd.entity);
 }
 
+static int hailo15_isp_parse_null_addr(struct hailo15_isp_device* isp_dev){
+	struct fwnode_handle *ep = NULL;
+	int ret = -EINVAL;
+
+	ep = dev_fwnode(isp_dev->dev);;
+
+	if(!ep){
+		return -EINVAL;
+	}
+
+	ret = fwnode_property_read_u32(ep, "null-addr", &isp_dev->null_addr);
+
+	return ret;
+}
+
+
 /* Init the isp device.                               */
 /* These include any previous initialization function */
 static int hailo15_init_isp_device(struct hailo15_isp_device *isp_dev)
@@ -1235,6 +1258,12 @@ static int hailo15_init_isp_device(struct hailo15_isp_device *isp_dev)
 
 	if (!isp_dev)
 		return -EINVAL;
+
+	ret = hailo15_isp_parse_null_addr(isp_dev);
+	if(ret){
+		dev_err(isp_dev->dev, "can't parse null address\n");
+		return ret;
+	}
 
 	mutex_init(&isp_dev->mlock);
 	mutex_init(&isp_dev->ctrl_lock);
@@ -1428,7 +1457,7 @@ static int hailo15_isp_probe(struct platform_device *pdev)
 	mutex_init(&af_kevent.data_lock);
 	isp_dev->af_kevent = &af_kevent;
 
-	isp_dev->af_wq = create_singlethread_workqueue("af_wq");
+	isp_dev->af_wq = alloc_ordered_workqueue("af_wq", WQ_HIGHPRI);
 	if (!isp_dev->af_wq) {
 		dev_err(dev, "can't create af workqueue\n");
 		goto err_create_wq;

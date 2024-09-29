@@ -6,6 +6,9 @@
 #include <linux/of.h>
 #include <linux/soc/hailo/scmi_hailo_ops.h>
 
+#define	SCMI_HAILO_BOOT_SUCCESS_AP_SOFTWARE  1
+#define	SCMI_HAILO_BOOT_SUCCESS_SW_UPDATE 99
+
 static const struct scmi_hailo_ops *hailo_ops;
 
 static const struct of_device_id hailo_soc_of_match[] = {
@@ -76,31 +79,45 @@ static ssize_t boot_success_ap_software_store(struct device *dev, struct device_
 	if (kstrtou8(buf, 0, &val))
 		return -EINVAL;
 
-	// Boot success indication file can only be updated to 1, and only once per boot
-	if ((val != 1) || (hailo_soc->boot_info.boot_status_bitmap.boot_success_ap_software == 1))
-	{
-		dev_err(dev, "boot_success_ap_software_store: invalid value (=%d), or file already set to 1 (=%d)\n",
-				val, hailo_soc->boot_info.boot_status_bitmap.boot_success_ap_software);
-		return -EINVAL;
-	}
-
-	hailo_soc->boot_info.boot_status_bitmap.boot_success_ap_software = val;
-
-	// Send SCMI message to SCU FW, indicating linux boot success
 	hailo_ops = scmi_hailo_get_ops();
 	if (IS_ERR(hailo_ops))
 		return PTR_ERR(hailo_ops);
 
-	pr_info("SCU booted from:                %s",
-		hailo15_boot_options[
-			hailo_soc->boot_info.active_boot_image_storage & H15__SCU_BOOT_BIT_MASK]);
+	// value == 1 indicates that linux has booted successfully
+	if(val == SCMI_HAILO_BOOT_SUCCESS_AP_SOFTWARE)
+	{
+		hailo_soc->boot_info.boot_status_bitmap.boot_success_ap_software = val;
 
-	params.component = SCMI_HAILO_BOOT_SUCCESS_COMPONENT_AP_SOFTWARE;
-	ret = hailo_ops->send_boot_success_ind(&params);
-	if (ret) {
-		dev_err(dev, "Failed to send boot success indication\n");
-		return ret;
+		pr_info("SCU booted from:                %s",
+			hailo15_boot_options[
+				hailo_soc->boot_info.active_boot_image_storage & H15__SCU_BOOT_BIT_MASK]);
+
+		// Send SCMI message to SCU FW, indicating linux boot success
+		params.component = SCMI_HAILO_BOOT_SUCCESS_COMPONENT_AP_SOFTWARE;
+		ret = hailo_ops->send_boot_success_ind(&params);
+		if (ret) {
+			dev_err(dev, "Failed to send boot success indication\n");
+			return ret;
+		}
 	}
+	
+	// value == 99 indicates swupdate procedure has just completed
+	else if(val == SCMI_HAILO_BOOT_SUCCESS_SW_UPDATE)
+	{
+		// send SCMI message to SCU FW, indicating swupdate procedure has completed
+		ret = hailo_ops->send_swupdate_ind();
+		if (ret) {
+			dev_err(dev, "Failed to send swupdate indication\n");
+			return ret;
+		}	
+	}
+
+	else
+	{
+		dev_err(dev, "boot_success_ap_software_store: invalid value (=%d)\n", val);
+		return -EINVAL;
+	}
+
 	return count;
 }
 

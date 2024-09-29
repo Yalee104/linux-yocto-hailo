@@ -112,26 +112,21 @@
     };
 };
 
+#define GPIO_LINE_NAMES \
+    "cam0_reset_n",             "cam1_reset_n",         "DSI_RST",                  "CAM_TRIG", \
+    "PCIe_ref_clk_en",          "gpio_in_out_5",        "Low_power_in",             "Low_power_out", \
+    "Ext_wakeUp",               "sdio0_gp_in",          "sdio0_cd_in",              "usb_overcurrent_n_in", \
+    "usb_drive_vbus_out",       "sdio1_gp_in",          "sdio1_cd_in_n",            "pcie_mperst_out", \
+    \
+    "gpio_in_out_16",           "WiFi_BT_disable_n",    "timer_ext_in0",            "timer_ext_in1", \
+    "shut_down_out",            "gpio_in_out_21",       "i2c2_sda_in_out",          "i2c2_scl_out", \
+    "i2c2_current_src_en_out",  "i2c0_current_src_en_out", "i2c1_current_src_en_out", "gpio_in_out_27", \
+    "gpio_in_out_28",           "DSI_INTR",             "uart0_cts_pad_in",         "uart0_rts_pad_out"
+
 &gpio0 {
     gpio-ranges = <&pinctrl 0 0 16>;
 
-    gpio-line-names =
-        "cam0_reset_n",
-        "cam1_reset_n",
-        "DSI_RST",
-        "CAM_TRIG",
-        "PCIe_ref_clk_en",
-        "gpio_in_out_5",
-        "Low_power_in",
-        "Low_power_out",
-        "Ext_wakeUp",
-        "sdio0_gp_in",
-        "sdio0_cd_in",
-        "usb_overcurrent_n_in",
-        "usb_drive_vbus_out",
-        "sdio1_gp_in",
-        "sdio1_cd_in_n",
-        "pcie_mperst_out";
+    gpio-line-names = GPIO_LINE_NAMES;
 
     pin_cam1_reset_n {
         gpio-hog;
@@ -186,23 +181,7 @@
 &gpio1 {
     gpio-ranges = <&pinctrl 0 16 16>;
 
-    gpio-line-names =
-        "gpio_in_out_16",
-        "WiFi_BT_disable_n",
-        "timer_ext_in0",
-        "timer_ext_in1",
-        "shut_down_out",
-        "gpio_in_out_21",
-        "i2c2_sda_in_out",
-        "i2c2_scl_out",
-        "i2c2_current_src_en_out",
-        "i2c0_current_src_en_out",
-        "i2c1_current_src_en_out",
-        "gpio_in_out_27",
-        "gpio_in_out_28",
-        "DSI_INTR",
-        "uart0_cts_pad_in",
-        "uart0_rts_pad_out";
+    gpio-line-names = GPIO_LINE_NAMES;
 
     pin_WiFi_BT_disable_n {
         gpio-hog;
@@ -217,12 +196,4 @@
         output-low;
         line-name = "DSI_INTR";
     };
-};
-
-&torrent_phy {
-    status = "okay";
-};
-
-&usb3 {
-    status = "okay";
 };

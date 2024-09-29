@@ -331,6 +331,7 @@ static const struct imx334_reg mode_3840x2160_regs[] = {
 	{0x3796, 0xa1},
 	{0x3e04, 0x0e},
 	{0x3a00, 0x01},
+	{0x31a1, 0x0c},
 };
 
 
@@ -1123,6 +1124,29 @@ static int imx334_g_frame_interval(struct v4l2_subdev *sd,
 	return 0;
 }
 
+static int check_sensor_id(struct imx334 *imx334, u16 id_reg, u8 sensor_id)
+{
+    int ret;
+    u32 id;
+
+    ret = imx334_read_reg(imx334, id_reg, 1, &id);
+    if (ret) {
+        dev_err(imx334->dev,
+            "failed to read sensor id register 0x%x, ret %d\n",
+            id_reg, ret);
+        return ret;
+    }
+
+    if (id != sensor_id) {
+        dev_info(imx334->dev,
+            "sensor is not connected: (reg %x, expected %x, found %x)",
+            id_reg, sensor_id, id);
+        return -ENXIO;
+    }
+
+    return 0;
+}
+
 /**
  * imx334_detect() - Detect imx334 sensor
  * @imx334: pointer to imx334 device
@@ -1132,20 +1156,15 @@ static int imx334_g_frame_interval(struct v4l2_subdev *sd,
 static int imx334_detect(struct imx334 *imx334)
 {
 	int ret;
-	u32 val;
-
-	ret = imx334_read_reg(imx334, GENERIC_SENSOR_ID_REG, 1, &val);
+	
+	ret = check_sensor_id(imx334, GENERIC_SENSOR_ID_REG, SENSOR_ID_IMX334_IMX715);
 	if (ret)
 		return ret;
-
-	if (val != SENSOR_ID_IMX334) {
-		dev_info(imx334->dev,
-			"sensor is not connected: (expected %x, found %x)",
-			SENSOR_ID_IMX334, val);
-		return -ENXIO;
-	}
-
-	dev_info(imx334->dev, "sensor detected!");
+	
+	ret = check_sensor_id(imx334, GENERIC_SENSOR_ID_REG2, IMX334_SENSOR_ID_VAL);
+	if (ret)
+		return ret;
+	
 	return 0;
 }
 

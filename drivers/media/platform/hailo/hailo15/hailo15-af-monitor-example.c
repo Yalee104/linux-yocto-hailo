@@ -6,6 +6,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/workqueue.h>
 #include "hailo15-events.h"
 
 MODULE_AUTHOR("Tommy Hefner <tommyh@hailo.ai>");
@@ -14,17 +15,31 @@ MODULE_LICENSE("GPL v2");
 
 extern struct hailo15_af_kevent af_kevent;
 
-static int __init monitor_init(void)
-{
+struct workqueue_struct *monitor_wq;
+struct work_struct monitor_w;
+
+bool interrupted = false;
+spinlock_t interrupt_lock;
+
+void monitor_af_statistics(struct work_struct *work) {
 	int ret;
 	pr_info("%s - starting af monitor\n", __func__);
 	while (1) {
 		ret = wait_event_interruptible(af_kevent.wait_q,
-					       af_kevent.ready != 0);
+						   (af_kevent.ready != 0) || (interrupted));
+
+		spin_lock(&interrupt_lock);
+		if (interrupted) {
+			pr_info("Work function interrupted explicitly.\n");
+			spin_unlock(&interrupt_lock);
+			return;
+		}
+		spin_unlock(&interrupt_lock);
+
 		if (ret) {
 			pr_info("%s - monitor interrupted, exiting\n",
 				__func__);
-			return -EINTR;
+			return;
 		}
 
 		pr_debug("%s - af event ready\n", __func__);
@@ -38,12 +53,40 @@ static int __init monitor_init(void)
 		mutex_unlock(&af_kevent.data_lock);
 	}
 
+	return;
+}
+
+static int __init monitor_init(void)
+{
+	pr_info("creating af monitor work queue\n");
+	spin_lock_init(&interrupt_lock);
+	monitor_wq = alloc_ordered_workqueue("monitor_wq", WQ_HIGHPRI);
+	if (!monitor_wq) {
+		pr_err("can't create af workqueue\n");
+		return -ENOMEM;
+	}
+
+	INIT_WORK(&monitor_w, monitor_af_statistics);
+	queue_work(monitor_wq, &monitor_w);
+	pr_info("Module loaded.\n");
 	return 0;
 }
 
 static void __exit monitor_remove(void)
 {
-	pr_info("%s - af monitor\n", __func__);
+	if(monitor_wq) {
+		pr_info("destroying af monitor work queue\n");
+		spin_lock(&interrupt_lock);
+		interrupted = true;
+		spin_unlock(&interrupt_lock);
+
+		// Wake up the waiting work
+		wake_up_interruptible(&af_kevent.wait_q);
+		cancel_work_sync(&monitor_w);
+		destroy_workqueue(monitor_wq);
+	}
+
+	pr_info("%s - done\n", __func__);
 }
 
 module_init(monitor_init);

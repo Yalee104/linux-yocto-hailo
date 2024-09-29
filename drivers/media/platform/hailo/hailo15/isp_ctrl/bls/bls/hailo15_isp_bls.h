@@ -58,6 +58,7 @@
 #define HAILO15_ISP_CID_BLS_GREEN_RED (HAILO15_ISP_CID_BLS_BASE + 0x0001)
 #define HAILO15_ISP_CID_BLS_GREEN_BLUE (HAILO15_ISP_CID_BLS_BASE + 0x0002)
 #define HAILO15_ISP_CID_BLS_BLUE (HAILO15_ISP_CID_BLS_BASE + 0x0003)
+#define HAILO15_ISP_CID_BLS_MODE (HAILO15_ISP_CID_BLS_BASE + 0x0004)
 
 int hailo15_isp_bls_ctrl_count(void);
 int hailo15_isp_bls_ctrl_create(struct hailo15_isp_device *isp_dev);

@@ -12,5 +12,7 @@ dtb-$(CONFIG_ARCH_HAILO15) += hailo15-veloce.dtb
 dtb-$(CONFIG_ARCH_HAILO15) += hailo15l-veloce.dtb
 dtb-$(CONFIG_ARCH_HAILO15) += hailo15-vp.dtb
 dtb-$(CONFIG_ARCH_HAILO15) += hailo15l-oregano.dtb
+dtb-$(CONFIG_ARCH_HAILO15) += hailo15l-evb.dtb
+dtb-$(CONFIG_ARCH_HAILO15) += hailo15l-sbc.dtb
 dtb-$(CONFIG_ARCH_HAILO15) += hailo15-sbc.dtb
 dtb-$(CONFIG_ARCH_HAILO15) += hailo10-m2.dtb

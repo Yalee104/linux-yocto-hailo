@@ -464,7 +464,6 @@ static int rpi_touchscreen_dsi_probe(struct mipi_dsi_device *dsi)
 	int ret;
 
 	dsi->mode_flags = (MIPI_DSI_MODE_VIDEO |
-			   MIPI_DSI_MODE_VIDEO_SYNC_PULSE |
 			   MIPI_DSI_MODE_LPM);
 	dsi->format = MIPI_DSI_FMT_RGB888;
 	dsi->lanes = 1;

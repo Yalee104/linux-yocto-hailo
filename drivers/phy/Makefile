@@ -15,6 +15,7 @@ obj-y					+= allwinner/	\
 					   broadcom/	\
 					   cadence/	\
 					   freescale/	\
+					   hailo/	\
 					   hisilicon/	\
 					   ingenic/	\
 					   intel/	\

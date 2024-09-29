@@ -71,6 +71,7 @@ static int hailo15_isp_cproc_s_ctrl(struct v4l2_ctrl *ctrl)
 	case HAILO15_ISP_CID_CPROC_SATURATION:
 	case HAILO15_ISP_CID_CPROC_HUE:
 	case HAILO15_ISP_CID_CPROC_CONTRAST:
+	case HAILO15_ISP_CID_CPROC_MODE:
 		ret = hailo15_isp_s_ctrl_event(isp_dev, isp_dev->ctrl_pad,
 					       ctrl);
 		break;
@@ -98,6 +99,7 @@ static int hailo15_isp_cproc_g_ctrl(struct v4l2_ctrl *ctrl)
 	case HAILO15_ISP_CID_CPROC_SATURATION:
 	case HAILO15_ISP_CID_CPROC_HUE:
 	case HAILO15_ISP_CID_CPROC_CONTRAST:
+	case HAILO15_ISP_CID_CPROC_MODE:
 		ret = hailo15_isp_g_ctrl_event(isp_dev, isp_dev->ctrl_pad,
 					       ctrl);
 		break;
@@ -211,6 +213,18 @@ const struct v4l2_ctrl_config hailo15_isp_cproc_ctrls[] = {
 		.max = 199,
 		.def = 30,
 	},
+    {
+        /* manual/auto */
+        .ops  = &hailo15_isp_cproc_ctrl_ops,
+        .id   = HAILO15_ISP_CID_CPROC_MODE,
+        .type = V4L2_CTRL_TYPE_BOOLEAN,
+        .flags= V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
+        .name = "isp_cproc_mode",
+        .step = 1,
+        .min  = 0,
+        .max  = 1,
+    },
+
 };
 
 int hailo15_isp_cproc_ctrl_count(void)

@@ -85,6 +85,8 @@ struct stats {
     uint8_t max_threads;
 };
 
+struct xrp_hw_ops;
+
 struct xvp {
     struct device *dev;
     const char *firmware_name;
@@ -103,9 +105,11 @@ struct xvp {
 
     void __iomem *dsp_config;
     phys_addr_t dsp_config_phys;
+
+    const struct xrp_hw_ops *hw_ops;
+
     struct reset_control *dsp_reset;
     struct clk *dsp_config_clock;
-    struct clk *dsp_pll_clock;
     struct clk *dsp_clock;
     struct mbox_client mbox_client;
     struct mbox_chan *mbox_chan;

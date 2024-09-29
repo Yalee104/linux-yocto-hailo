@@ -62,6 +62,7 @@
 #define HAILO15_ISP_CID_CPROC_SATURATION (HAILO15_ISP_CID_CPROC_BASE + 0x0005)
 #define HAILO15_ISP_CID_CPROC_HUE (HAILO15_ISP_CID_CPROC_BASE + 0x0006)
 #define HAILO15_ISP_CID_CPROC_CONTRAST (HAILO15_ISP_CID_CPROC_BASE + 0x0007)
+#define HAILO15_ISP_CID_CPROC_MODE (HAILO15_ISP_CID_CPROC_BASE + 0x0008)
 
 int hailo15_isp_cproc_ctrl_count(void);
 int hailo15_isp_cproc_ctrl_create(struct hailo15_isp_device *isp_dev);

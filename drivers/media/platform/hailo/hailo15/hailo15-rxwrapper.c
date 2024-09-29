@@ -221,6 +221,7 @@ struct hailo15_rxwrapper_priv {
 	void *private_data;
 	int irq;
 	int num_exposures;
+	u64 frame_count;
 };
 
 static const struct v4l2_mbus_framefmt fmt_default = {
@@ -795,6 +796,7 @@ int hailo15_rxwrapper_set_stream(struct v4l2_subdev *sd, int enable)
 					hailo15_rxwrapper_pipe_set_data_address_or_null(hailo15_rxwrapper, pipe);
 				}
 				v4l2_subdev_call(subdev, video, s_stream, enable);
+				hailo15_rxwrapper->frame_count = 0;
 			} else {
 				v4l2_subdev_call(subdev, video, s_stream, enable);
 				for (pipe = 0; pipe < hailo15_rxwrapper->num_exposures; pipe++) {
@@ -813,6 +815,7 @@ int hailo15_rxwrapper_set_stream(struct v4l2_subdev *sd, int enable)
 					RXWRAPPER_PIPES_CTL_CREDIT_HANDLER_SRST_SHIFT,
 					RXWRAPPER_PIPES_CTL_CREDIT_HANDLER_SRST_WIDTH, 0x1);
 				}
+				hailo15_rxwrapper->frame_count = 0;
 			}
 		} else
 			v4l2_subdev_call(subdev, video, s_stream, enable);
@@ -1012,6 +1015,7 @@ hailo15_rxwrapper_buffer_done(struct hailo15_rxwrapper_priv *hailo15_rxwrapper, 
 				RXWRAPPER_PIPES_CFG_CREDIT_HANDLER_EXT_UNPROCESSED_CNT_WIDTH, 1);
 			pipe = is_first_frame_hdr ? pipe-1 : pipe;
 		}
+		hailo15_rxwrapper->frame_count++;
 	}
 	if (at_least_one_pipe_dropping) {
 		for (pipe = 0; pipe < hailo15_rxwrapper->num_exposures; pipe++) {
@@ -1317,11 +1321,25 @@ static irqreturn_t hailo15_rxwrapper_irq_handler(int irq, void *arg)
 	return IRQ_HANDLED;
 }
 
+static int hailo15_rxwrapper_get_frame_count(struct hailo15_dma_ctx *dma_ctx, int grp_id,
+                                           uint64_t *fc)
+{
+        struct hailo15_rxwrapper_priv *hailo15_rxwrapper =
+                (struct hailo15_rxwrapper_priv *)dma_ctx->dev;
+        if (!fc)
+                return -EINVAL;
+
+        *fc = hailo15_rxwrapper->frame_count;
+        return 0;
+}
+
+
 static struct hailo15_buf_ops hailo15_rxwrapper_buf_ops = {
 	.buffer_process = hailo15_rxwrapper_buffer_process,
 	.set_private_data = hailo15_rxwrapper_set_private_data,
 	.get_private_data = hailo15_rxwrapper_get_private_data,
 	.queue_empty = hailo15_rxwrapper_queue_empty,
+	.get_frame_count = hailo15_rxwrapper_get_frame_count,
 };
 
 static int

@@ -151,6 +151,7 @@
 	(HAILO15_ISP_CID_DMSC_BASE + 0x0035)
 #define HAILO15_ISP_CID_DMSC_SKIN_Y_THR_MAX (HAILO15_ISP_CID_DMSC_BASE + 0x0036)
 #define HAILO15_ISP_CID_DMSC_SKIN_Y_THR_MIN (HAILO15_ISP_CID_DMSC_BASE + 0x0037)
+#define HAILO15_ISP_CID_DMSC_MODE (HAILO15_ISP_CID_DMSC_BASE + 0x0038)
 
 int hailo15_isp_dmscv2_ctrl_count(void);
 int hailo15_isp_dmscv2_ctrl_create(struct hailo15_isp_device *isp_dev);

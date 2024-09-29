@@ -117,6 +117,21 @@
     status = "disabled";
 };
 
+&xspi {
+    status = "okay";
+
+    spi0_flash0: flash@0 {
+        /* values for MT25QU01G */
+        spi-max-frequency = <6250000>; /* 90Mhz in DTR, 166Mhz in STR */
+        cdns,read-delay = <7>;
+        cdns,tshsl-ns = <30>;
+        cdns,tsd2d-ns = <30>;
+        cdns,tchsh-ns = <5>;
+        cdns,tslch-ns = <3>;
+    };
+};
+
+
 /delete-node/ &cpu_1;
 /delete-node/ &cpu_2;
 /delete-node/ &cpu_3;

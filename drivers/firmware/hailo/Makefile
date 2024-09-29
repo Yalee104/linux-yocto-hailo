@@ -5,7 +5,8 @@
 #
 
 obj-${CONFIG_HAILO_XRP} += xvp_main.o xrp_alloc.o xrp_io.o xrp_cma_alloc.o \
-    xrp_boot.o xrp_exec.o xrp_firmware.o xrp_hw.o xrp_log.o xrp_share.o xrp_fs.o
+    xrp_boot.o xrp_exec.o xrp_firmware.o xrp_log.o xrp_share.o xrp_fs.o \
+    xrp_hw.o xrp_hw_hailo15.o xrp_hw_hailo15l.o
 
 ccflags-$(CONFIG_HAILO_XRP_DEBUG) += -DDEBUG
 

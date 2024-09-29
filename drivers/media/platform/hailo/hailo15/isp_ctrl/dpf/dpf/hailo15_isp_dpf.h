@@ -61,6 +61,7 @@
 #define HAILO15_ISP_CID_DPF_OFFSET (HAILO15_ISP_CID_DPF_BASE + 0x0004)
 #define HAILO15_ISP_CID_DPF_BOUND_MIN (HAILO15_ISP_CID_DPF_BASE + 0x0005)
 #define HAILO15_ISP_CID_DPF_DIVISION_FACTOR (HAILO15_ISP_CID_DPF_BASE + 0x0006)
+#define HAILO15_ISP_CID_DPF_MODE (HAILO15_ISP_CID_DPF_BASE + 0x0007)
 
 int hailo15_isp_dpf_ctrl_count(void);
 int hailo15_isp_dpf_ctrl_create(struct hailo15_isp_device *isp_dev);

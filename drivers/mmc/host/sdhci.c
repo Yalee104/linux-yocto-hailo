@@ -2790,8 +2790,8 @@ static int __sdhci_execute_tuning(struct sdhci_host *host, u32 opcode)
 		sdhci_send_tuning(host, opcode);
 
 		if (!host->tuning_done) {
-			pr_debug("%s: Tuning timeout, falling back to fixed sampling clock\n",
-				 mmc_hostname(host->mmc));
+			pr_err("%s: Tuning timeout, falling back to fixed sampling clock\n",
+			       mmc_hostname(host->mmc));
 			sdhci_abort_tuning(host, opcode);
 			return -ETIMEDOUT;
 		}
@@ -2809,7 +2809,7 @@ static int __sdhci_execute_tuning(struct sdhci_host *host, u32 opcode)
 
 	}
 
-	pr_debug("%s: Tuning failed, falling back to fixed sampling clock\n",
+	pr_err("%s: Tuning failed, falling back to fixed sampling clock\n",
 		mmc_hostname(host->mmc));
 	sdhci_reset_tuning(host);
 	return -EAGAIN;

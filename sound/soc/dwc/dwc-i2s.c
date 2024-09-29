@@ -163,8 +163,15 @@ static void i2s_start(struct dw_i2s_dev *dev,
 		      struct snd_pcm_substream *substream)
 {
 	struct i2s_clk_config_data *config = &dev->config;
+	u32 component_version = i2s_read_reg(dev->i2s_base, I2S_COMP_VERSION);
+	u32 val = 0;
 
-	i2s_write_reg(dev->i2s_base, IER, 1);
+
+	if (component_version >= I2S_COMP_VERSION_1_13) {
+		val = i2s_read_reg(dev->i2s_base, IER);
+	}
+	val |= 1;
+	i2s_write_reg(dev->i2s_base, IER, val);
 	i2s_enable_irqs(dev, substream->stream, config->chan_nr);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
@@ -490,6 +497,17 @@ static const u32 formats[COMP_MAX_WORDSIZE] = {
 	0
 };
 
+static int dw_i2s_op_mode_get(struct dw_i2s_dev *dev)
+{
+	u32 comp1 = i2s_read_reg(dev->i2s_base, dev->i2s_reg_comp1);
+	u32 component_version = i2s_read_reg(dev->i2s_base, I2S_COMP_VERSION);
+	u32	ier = i2s_read_reg(dev->i2s_base, IER);
+	if (component_version >= I2S_COMP_VERSION_1_13) {
+		return IER_I2S_OP_MODE(ier) ? DW_I2S_MASTER : DW_I2S_SLAVE;
+	}
+	return (COMP1_MODE_EN(comp1) ? DW_I2S_MASTER : DW_I2S_SLAVE);
+}
+
 static int dw_configure_dai(struct dw_i2s_dev *dev,
 				   struct snd_soc_dai_driver *dw_i2s_dai,
 				   unsigned int rates)
@@ -539,7 +557,7 @@ static int dw_configure_dai(struct dw_i2s_dev *dev,
 		dw_i2s_dai->capture.rates = rates;
 	}
 
-	if (COMP1_MODE_EN(comp1)) {
+	if (dw_i2s_op_mode_get(dev) == DW_I2S_MASTER) {
 		dev_dbg(dev->dev, "designware: i2s master mode supported\n");
 		dev->capability |= DW_I2S_MASTER;
 	} else {

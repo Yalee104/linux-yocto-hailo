@@ -15,11 +15,12 @@ static struct scmi_device *hailo_sdev = NULL;
 
 static int scmi_hailo_register_notifier(u8 evt_id, struct notifier_block *nb);
 static int scmi_hailo_set_eth_rmii(void);
-static int scmi_hailo_start_measure(struct scmi_hailo_ddr_start_measure_a2p *params);
+static int scmi_hailo_start_measure(struct scmi_hailo_noc_start_measure_a2p *params);
 static int scmi_hailo_stop_measure(bool *was_running);
 static int scmi_hailo_get_boot_info(struct scmi_hailo_get_boot_info_p2a *boot_info);
 static int scmi_hailo_get_fuse_info(struct scmi_hailo_get_fuse_info_p2a *fuse_info);
 static int scmi_hailo_send_boot_success_ind(struct scmi_hailo_boot_success_indication_a2p *params);
+static int scmi_hailo_send_swupdate_ind(void);
 
 const struct scmi_hailo_ops ops = {
 	.register_notifier = scmi_hailo_register_notifier,
@@ -29,6 +30,7 @@ const struct scmi_hailo_ops ops = {
 	.start_measure = scmi_hailo_start_measure,
 	.stop_measure = scmi_hailo_stop_measure,
 	.send_boot_success_ind = scmi_hailo_send_boot_success_ind,
+	.send_swupdate_ind = scmi_hailo_send_swupdate_ind,
 };
 
 static int scmi_hailo_register_notifier(u8 evt_id, struct notifier_block *nb)
@@ -57,7 +59,7 @@ static int scmi_hailo_set_eth_rmii(void)
 	return hailo_ops->set_eth_rmii(ph);
 }
 
-static int scmi_hailo_start_measure(struct scmi_hailo_ddr_start_measure_a2p *params)
+static int scmi_hailo_start_measure(struct scmi_hailo_noc_start_measure_a2p *params)
 {
 	return hailo_ops->start_measure(ph, params);
 }
@@ -65,7 +67,7 @@ static int scmi_hailo_start_measure(struct scmi_hailo_ddr_start_measure_a2p *par
 static int scmi_hailo_stop_measure(bool *was_running)
 {
 	int result;
-	struct scmi_hailo_ddr_stop_measure_p2a output;
+	struct scmi_hailo_noc_stop_measure_p2a output;
 	result = hailo_ops->stop_measure(ph, &output);
 	*was_running = output.was_running;
 	return result;
@@ -84,6 +86,11 @@ static int scmi_hailo_get_fuse_info(struct scmi_hailo_get_fuse_info_p2a *fuse_in
 static int scmi_hailo_send_boot_success_ind(struct scmi_hailo_boot_success_indication_a2p *params)
 {
 	return hailo_ops->send_boot_success_ind(ph, params);
+}
+
+static int scmi_hailo_send_swupdate_ind(void)
+{
+	return hailo_ops->send_swupdate_ind(ph);
 }
 
 int scmi_hailo_ops_init(struct scmi_device *sdev)

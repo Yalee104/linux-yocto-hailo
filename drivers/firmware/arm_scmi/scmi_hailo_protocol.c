@@ -62,21 +62,27 @@ static int scmi_hailo_set_eth_rmii(const struct scmi_protocol_handle *ph)
 	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_SET_ETH_RMII_MODE_ID, NULL, 0, NULL, 0);
 	return ret;
 }
-static int scmi_hailo_start_measure(const struct scmi_protocol_handle *ph, struct scmi_hailo_ddr_start_measure_a2p *params)
+static int scmi_hailo_start_measure(const struct scmi_protocol_handle *ph, struct scmi_hailo_noc_start_measure_a2p *params)
 {
-	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_DDR_START_MEASURE_ID, params, sizeof(*params), NULL, 0);
+	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_NOC_START_MEASURE_ID, params, sizeof(*params), NULL, 0);
 	return ret;
 }
 
-static int scmi_hailo_stop_measure(const struct scmi_protocol_handle *ph, struct scmi_hailo_ddr_stop_measure_p2a *output)
+static int scmi_hailo_stop_measure(const struct scmi_protocol_handle *ph, struct scmi_hailo_noc_stop_measure_p2a *output)
 {
-	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_DDR_STOP_MEASURE_ID, NULL, 0, output, sizeof(*output));
+	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_NOC_STOP_MEASURE_ID, NULL, 0, output, sizeof(*output));
 	return ret;
 }
 
 static int scmi_hailo_send_boot_success_ind(const struct scmi_protocol_handle *ph, struct scmi_hailo_boot_success_indication_a2p *params)
 {
 	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_BOOT_SUCCESS_INDICATION_ID, params, sizeof(*params), NULL, 0);
+	return ret;
+}
+
+static int scmi_hailo_send_swupdate_ind(const struct scmi_protocol_handle *ph)
+{
+	int ret = scmi_hailo_xfer(ph, SCMI_HAILO_SWUPDATE_INDICATION_ID, NULL, 0, NULL, 0);
 	return ret;
 }
 
@@ -87,6 +93,7 @@ static const struct scmi_hailo_proto_ops hailo_proto_ops = {
 	.start_measure = scmi_hailo_start_measure,
 	.stop_measure = scmi_hailo_stop_measure,
 	.send_boot_success_ind = scmi_hailo_send_boot_success_ind,
+	.send_swupdate_ind = scmi_hailo_send_swupdate_ind,
 };
 
 static int scmi_hailo_protocol_init(const struct scmi_protocol_handle *ph)
@@ -120,11 +127,11 @@ static int hailo_scmi_set_notify_enabled(const struct scmi_protocol_handle *ph, 
 typedef void* (*scmi_hailo_notification_handler)(const struct scmi_protocol_handle*, u8, ktime_t, const void*, size_t, void*, u32*);
 
 // Define event handler functions
-static void* handle_ddr_measurement_trigger(const struct scmi_protocol_handle* ph, u8 evt_id, ktime_t timestamp,
+static void* handle_noc_measurement_trigger(const struct scmi_protocol_handle* ph, u8 evt_id, ktime_t timestamp,
 											const void* payld, size_t payld_sz, void* report, u32* src_id)
 {
-	const struct scmi_hailo_ddr_measurement_trigger_notification *trigger_p = payld;
-	struct scmi_hailo_ddr_measurement_trigger_notification *trigger_r = report;
+	const struct scmi_hailo_noc_measurement_trigger_notification *trigger_p = payld;
+	struct scmi_hailo_noc_measurement_trigger_notification *trigger_r = report;
 
 	if (sizeof(*trigger_p) != payld_sz)
 		return NULL;
@@ -135,11 +142,11 @@ static void* handle_ddr_measurement_trigger(const struct scmi_protocol_handle* p
 
 }
 
-static void* handle_ddr_measurement_ended(const struct scmi_protocol_handle* ph, u8 evt_id, ktime_t timestamp,
+static void* handle_noc_measurement_ended(const struct scmi_protocol_handle* ph, u8 evt_id, ktime_t timestamp,
 										  const void* payld, size_t payld_sz, void* report, u32* src_id)
 {
-	const struct scmi_hailo_ddr_measurement_ended_notification *ended_p = payld;
-	struct scmi_hailo_ddr_measurement_ended_notification *ended_r = report;
+	const struct scmi_hailo_noc_measurement_ended_notification *ended_p = payld;
+	struct scmi_hailo_noc_measurement_ended_notification *ended_r = report;
 
 	if (sizeof(*ended_p) != payld_sz)
 		return NULL;
@@ -151,8 +158,8 @@ static void* handle_ddr_measurement_ended(const struct scmi_protocol_handle* ph,
 }
 
 static const scmi_hailo_notification_handler eventHandlers[SCMI_HAILO_NOTIFICATION_COUNT] = {
-	[SCMI_HAILO_DDR_MEASUREMENT_TRIGGER_NOTIFICATION_ID] = handle_ddr_measurement_trigger,
-	[SCMI_HAILO_DDR_MEASUREMENT_ENDED_NOTIFICATION_ID] = handle_ddr_measurement_ended,
+	[SCMI_HAILO_NOC_MEASUREMENT_TRIGGER_NOTIFICATION_ID] = handle_noc_measurement_trigger,
+	[SCMI_HAILO_NOC_MEASUREMENT_ENDED_NOTIFICATION_ID] = handle_noc_measurement_ended,
 };
 
 static void* hailo_scmi_fill_custom_report(const struct scmi_protocol_handle* ph, u8 evt_id, ktime_t timestamp,
@@ -174,14 +181,14 @@ static void* hailo_scmi_fill_custom_report(const struct scmi_protocol_handle* ph
 
 static const struct scmi_event events[] = {
 	{
-		.id = SCMI_HAILO_DDR_MEASUREMENT_TRIGGER_NOTIFICATION_ID,
-		.max_payld_sz = sizeof(struct scmi_hailo_ddr_measurement_trigger_notification),
-		.max_report_sz = sizeof(struct scmi_hailo_ddr_measurement_trigger_notification),
+		.id = SCMI_HAILO_NOC_MEASUREMENT_TRIGGER_NOTIFICATION_ID,
+		.max_payld_sz = sizeof(struct scmi_hailo_noc_measurement_trigger_notification),
+		.max_report_sz = sizeof(struct scmi_hailo_noc_measurement_trigger_notification),
 	},
 	{
-		.id = SCMI_HAILO_DDR_MEASUREMENT_ENDED_NOTIFICATION_ID,
-		.max_payld_sz = sizeof(struct scmi_hailo_ddr_measurement_ended_notification),
-		.max_report_sz = sizeof(struct scmi_hailo_ddr_measurement_ended_notification),
+		.id = SCMI_HAILO_NOC_MEASUREMENT_ENDED_NOTIFICATION_ID,
+		.max_payld_sz = sizeof(struct scmi_hailo_noc_measurement_ended_notification),
+		.max_report_sz = sizeof(struct scmi_hailo_noc_measurement_ended_notification),
 	},
 };
 

@@ -6,7 +6,7 @@
 
 #define H15L_PINMUX_PIN_COUNT (32)
 #define H15L_GPIO_PIN_BASE (60)
-#define H15L_IS_SDIO_PIN(_pin) ((_pin) >= 40 && (_pin) <= 51)
+#define H15L_IS_SDIO_PIN(_pin) (((_pin) >= 40 && (_pin) <= 51) || ((_pin) == 66))
 
 #define H15L_PIN_GROUP(_group_name, _pin_offset, _mode)                       \
 	{                                                                     \
@@ -15,7 +15,6 @@
 		.mode = (_mode),                                              \
 	}
 
-/* TODO: put standard GPIO pins first*/
 static const struct h15l_pin_group h15l_pin_groups[] = {
 	H15L_PIN_GROUP(gpio0_4, 60, 0),
 	H15L_PIN_GROUP(gpio1_3, 61, 0),
@@ -2062,6 +2061,8 @@ static const char *const parallel_vsync_in_grps[] = {
 		.num_groups = ARRAY_SIZE(func##_grps),                         \
 	}
 
+/* NOTE: Keep 32 first functions as they are (GPIO).
+         gpioN must be at index N. */
 static const struct h15l_pin_function h15l_pin_functions[] = {
 	H15_PIN_FUNCTION(gpio0),
 	H15_PIN_FUNCTION(gpio1),
@@ -2095,6 +2096,7 @@ static const struct h15l_pin_function h15l_pin_functions[] = {
 	H15_PIN_FUNCTION(gpio29),
 	H15_PIN_FUNCTION(gpio30),
 	H15_PIN_FUNCTION(gpio31),
+
 	H15_PIN_FUNCTION(boot_rom_failure_out),
 	H15_PIN_FUNCTION(can0_rx_in),
 	H15_PIN_FUNCTION(can0_stby_out),

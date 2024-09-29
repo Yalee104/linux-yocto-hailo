@@ -45,52 +45,34 @@
     /* set Linux,CMA area to 1 GiB */
     cma: linux,cma {
         size = <0x0 0x40000000>;
-        alloc-ranges = <0x0 0x82000000 0x0 0x40000000>;
+        alloc-ranges = <0x0 0x86000000 0x0 0x40000000>;
+    };
+    hailo_media_buf_cma: hailo_media_buf,cma {
+        status = "disabled";
     };
 };
+
+#define GPIO_LINE_NAMES \
+    "gpio_in_out_0",            "gpio_in_out_1",        "gpio_in_out_2",            "gpio_in_out_3", \
+    "gpio_in_out_4",            "boot_rom_led",         "gpio_in_out_6",            "gpio_in_out_7", \
+    "gpio_in_out_8",            "sdio1_reset",          "rmii_rst_n",               "gpio_in_out_11", \
+    "gpio_in_out_12",           "gpio_in_out_13",       "gpio_in_out_14",           "gpio_in_out_15", \
+    \
+    "gpio_in_out_16",           "gpio_in_out_17",       "gpio_in_out_18",           "ina_alert_n", \
+    "gpio_in_out_20",           "gpio_in_out_21",       "gpio_in_out_22",           "gpio_in_out_23", \
+    "gpio_in_out_24",           "gpio_in_out_25",       "gpio_in_out_26",           "gpio_in_out_27", \
+    "gpio_in_out_28",           "gpio_in_out_29",       "gpio_in_out_30",           "gpio_in_out_31"
 
 &gpio0 {
     gpio-ranges = <&pinctrl 0 0 16>;
 
-    gpio-line-names =
-        "gpio_in_out_0",
-        "gpio_in_out_1",
-        "gpio_in_out_2",
-        "gpio_in_out_3",
-        "gpio_in_out_4",
-        "boot_rom_led",
-        "gpio_in_out_6",
-        "gpio_in_out_7",
-        "gpio_in_out_8",
-        "sdio1_reset", /* Currently not connected */
-        "rmii_rst_n",
-        "gpio_in_out_11",
-        "gpio_in_out_12",
-        "gpio_in_out_13",
-        "gpio_in_out_14",
-        "gpio_in_out_15";
+    gpio-line-names = GPIO_LINE_NAMES;
 };
 
 &gpio1 {
     gpio-ranges = <&pinctrl 0 16 16>;
 
-    gpio-line-names =
-        "gpio_in_out_16",
-        "gpio_in_out_17",
-        "gpio_in_out_18",
-        "ina_alert_n",
-        "gpio_in_out_20",
-        "gpio_in_out_21",
-        "gpio_in_out_22",
-        "gpio_in_out_23",
-        "gpio_in_out_24",
-        "gpio_in_out_25",
-        "gpio_in_out_26",
-        "gpio_in_out_27",
-        "gpio_in_out_28",
-        "gpio_in_out_29",
-        "gpio_in_out_30",
-        "gpio_in_out_31";
+    gpio-line-names = GPIO_LINE_NAMES;
 };
 
 &hailo_pci_ep_driver {

@@ -888,6 +888,10 @@ static const struct st_lsm6dsx_settings st_lsm6dsx_sensor_settings[] = {
 				.addr = 0x12,
 				.mask = BIT(4),
 			},
+			.trig_mode = {
+				.addr = 0x15,
+				.mask = GENMASK(7,5),
+			},
 		},
 		.batch = {
 			[ST_LSM6DSX_ID_ACC] = {
@@ -1877,7 +1881,10 @@ static int st_lsm6dsx_init_hw_timer(struct st_lsm6dsx_hw *hw)
 		 * ttrim[ns] ~= 25000 - 37.5 * val
 		 * ttrim[ns] ~= 25000 - (37500 * val) / 1000
 		 */
-		hw->ts_gain -= ((s8)val * 37500) / 1000;
+		// hw->ts_gain -= ((s8)val * 37500) / 1000;
+		hw->ts_gain = (1000000000000000ULL  / (40000ULL +  (15ULL * (s64)val * 4ULL))); // in nsec
+		hw->actual_odr = (6667ULL * 10000ULL + (15ULL * val * 6667ULL)) / 32ULL / 10000ULL; // if ODR=208 then div is 32
+		dev_info(hw->dev, "ts_gain %lld, actual_odr %lld, val = %x\n", hw->ts_gain, hw->actual_odr, val);
 	}
 
 	return 0;
@@ -2134,6 +2141,15 @@ static int st_lsm6dsx_irq_setup(struct st_lsm6dsx_hw *hw)
 	reg = &hw->settings->irq_config.hla;
 	err = regmap_update_bits(hw->regmap, reg->addr, reg->mask,
 				 ST_LSM6DSX_SHIFT_VAL(irq_active_low,
+						      reg->mask));
+	if (err < 0)
+		return err;
+
+
+	/* Setup DEN(data enabled) Level-sensitive lached mode */
+	reg = &hw->settings->irq_config.trig_mode;
+	err = regmap_update_bits(hw->regmap, reg->addr, reg->mask,
+				 ST_LSM6DSX_SHIFT_VAL(ST_LSM6DSX_TRIG_MODE_LEVEL_LATCHED,
 						      reg->mask));
 	if (err < 0)
 		return err;

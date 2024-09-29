@@ -295,7 +295,13 @@
     };
 };
 
-&torrent_phy {
+&hailo_torrent_phy {
+    usb-lane = <3>;
+    usb-lane-pma-pll-full-rate-divider = <PCI_PMA_PLL_FULL_RATE_CLK_DIVIDER_4>;
+    lanes-config = <PCI_PHY_LINK_LANES_CFG__2x1_PLUS_1x2__MASTER_LANES_LN0_LN2_LN3>;
+};
+
+&cdns_torrent_phy {
     torrent_phy_pcie: phy@0 {
         reg = <0>;
         resets = <&scmi_reset HAILO15_SCMI_RESET_IDX_PCIE_PHY_LANE_0>, <&scmi_reset HAILO15_SCMI_RESET_IDX_PCIE_PHY_LANE_1>;
@@ -313,7 +319,7 @@
     };
 };
 
-&usb3 {
+&cdns_usb3 {
     dr_mode = "host";
     phys = <&torrent_phy_usb3>;
     phy-names = "cdns3,usb3-phy";

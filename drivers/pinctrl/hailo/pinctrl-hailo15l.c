@@ -10,16 +10,12 @@
 #include <linux/pinctrl/pinmux.h>
 #include <linux/pinctrl/pinconf-generic.h>
 #include <linux/printk.h>
+#include <linux/gpio/driver.h>
 
 #define GENERAL_PADS_CONFIG__PADS_PINMUX_BASE (0xA4)
 #define GPIO_PADS_CONFIG__DS__SIZE (0x4)
 #define GPIO_PADS_CONFIG__PADS_GPIO_DS_0 (0xC)
 #define H15L_MODE_INACTIVE (0b1111)
-
-static const unsigned char drive_strength_lookup[16] = {
-	0x0, 0x8, 0x4, 0xc, 0x2, 0xa, 0x6, 0xe,
-	0x1, 0x9, 0x5, 0xd, 0x3, 0xb, 0x7, 0xf,
-};
 
 /* Pctrl ops */
 
@@ -83,6 +79,75 @@ static void hailo15l_pin_dbg_show(struct pinctrl_dev *pctrl_dev,
 }
 
 /* Pinmux ops */
+
+static int hailo15l_gpio_request_enable(struct pinctrl_dev *pctrl_dev,
+					struct pinctrl_gpio_range *range,
+					unsigned pin)
+{
+	struct hailo15l_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
+	int ret, i;
+	char const *grp;
+	char const *const *groups;
+	unsigned num_groups;
+	unsigned func_select;
+	unsigned grp_select;
+	unsigned num_pins = 0;
+	const unsigned *pins = NULL;
+
+	/*
+		func_select for gpio's is the the number of the gpio (gpio-func for gpio 0 is gpio-func-0),
+		so the driver find the number of the desired gpio.
+		pin - is the pin number at the chip (at pinctrl numbering)
+		range->pin_base - is the base pin number of the GPIO range (the pin number of the first gpio at the current gpio-range)
+		range->id - is the start offset in the current gpio_chip number space (the first gpio number at the current gpio-range)
+		range->gc->offset - is the gpio-offset for the gpio bus that the current gpio is contained on
+
+		(pin - range->pin_base) give us the index of the gpio at the current gpio-range
+		((pin - range->pin_base) + range->id) give us the index of the gpio at the current gpio-bus
+		(((pin - range->pin_base) + range->id) + range->gc->offset) give us the index of the gpio at the chip,
+			taking into account gpio-bus-offst of gpio-bus
+	*/
+	func_select = pin - range->pin_base + range->id + range->gc->offset;
+	ret = pctrl_dev->desc->pmxops->get_function_groups(
+		pctrl_dev, func_select, &groups, &num_groups);
+	if (ret < 0) {
+		dev_err(pinctrl->dev, "can't query groups for function %u\n",
+			func_select);
+		return ret;
+	}
+	if (!num_groups) {
+		dev_err(pinctrl->dev,
+			"function %u can't be selected on any group\n",
+			func_select);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < num_groups; i++) {
+		grp = groups[i];
+		grp_select = pinctrl_get_group_selector(pctrl_dev, grp);
+		if (grp_select < 0) {
+			dev_err(pinctrl->dev, "invalid group %s in map table\n", grp);
+			return ret;
+		}
+		pctrl_dev->desc->pctlops->get_group_pins(pctrl_dev, grp_select,
+							&pins, &num_pins);
+		if (pins[0] == pin) {
+			break;
+		}
+	}
+
+	return pctrl_dev->desc->pmxops->set_mux(pctrl_dev, func_select, grp_select);
+}
+
+static void hailo15l_gpio_disable_free(struct pinctrl_dev *pctrl_dev,
+				      struct pinctrl_gpio_range *range,
+				      unsigned pin)
+{
+	/*
+	* TODO: https://hailotech.atlassian.net/browse/MSW-2477
+	*/
+	dev_dbg(pctrl_dev->dev, "hailo15l_gpio_disable_free pin=%u", pin);
+}
 
 static int hailo15l_get_functions_count(struct pinctrl_dev *pctldev)
 {
@@ -233,34 +298,6 @@ static int hailo15l_set_mux(struct pinctrl_dev *pctrl_dev,
 
 }
 
-static int hailo15l_gpio_request_enable(struct pinctrl_dev *pctrl_dev,
-				  struct pinctrl_gpio_range *range,
-				  unsigned gpio_pin)
-{
-	struct hailo15l_pinctrl *pinctrl = pinctrl_dev_get_drvdata(pctrl_dev);
-
-	if (gpio_pin >= H15L_PINMUX_PIN_COUNT) {
-		dev_err(pinctrl->dev,
-			"The pin number %d there was no matching gpio group\n",
-			gpio_pin);
-		return -EIO;
-	}
-
-	/* TODO: consider supporting other configurations */
-	return pctrl_dev->desc->pmxops->set_mux(
-		pctrl_dev, gpio_pin, range->pins[gpio_pin]);
-}
-
-static void hailo15l_gpio_disable_free(struct pinctrl_dev *pctrl_dev,
-				       struct pinctrl_gpio_range *range,
-				       unsigned pin)
-{
-	/*
-	* TODO: https://hailotech.atlassian.net/browse/MSW-2477
-	*/
-	dev_dbg(pctrl_dev->dev, "hailo15l_gpio_disable_free pin=%u", pin);
-}
-
 /* Pinconf ops */
 
 static int hailo15l_gpio_get_strength(struct pinctrl_dev *pctldev,
@@ -336,7 +373,7 @@ static int hailo15l_pad_get_strength(struct pinctrl_dev *pctldev,
 				     uint32_t *pad)
 {
 	/* Drive-strength reverse lookup is the same as forward lookup */
-	return drive_strength_lookup[PADS_CONFIG__DS__GET(readl(pad))];
+	return PADS_CONFIG__DS__GET(readl(pad));
 }
 
 static int hailo15l_pad_set_strength(struct pinctrl_dev *pctldev,
@@ -350,7 +387,7 @@ static int hailo15l_pad_set_strength(struct pinctrl_dev *pctldev,
 	raw_spin_lock_irqsave(&pinctrl->register_lock, flags);
 
 	value = readl(pad);
-	PADS_CONFIG__DS__MODIFY(value, drive_strength_lookup[strength_value]);
+	PADS_CONFIG__DS__MODIFY(value, strength_value);
 	writel(value, pad);
 
 	raw_spin_unlock_irqrestore(&pinctrl->register_lock, flags);
@@ -722,7 +759,7 @@ static void hailo15l_pin_config_dbg_show(struct pinctrl_dev *pctldev,
 
 	if (!hailo15l_pin_get_pull_enabled(pctldev, offset)) {
 		seq_printf(s, "pull-disabled ");
-	} else if (hailo15l_pin_get_pull_selector(pctldev, offset) == PIN_CONFIG_BIAS_PULL_UP) {
+	} else if (hailo15l_pin_get_pull_selector(pctldev, offset)) {
 		seq_printf(s, "pull-up ");
 	} else {
 		seq_printf(s, "pull-down ");

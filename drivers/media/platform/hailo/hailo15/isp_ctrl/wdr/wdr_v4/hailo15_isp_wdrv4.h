@@ -62,6 +62,7 @@
 #define HAILO15_ISP_CID_WDR_FLAT_STRENGTH (HAILO15_ISP_CID_WDR_BASE + 0x0005)
 #define HAILO15_ISP_CID_WDR_FLAT_THRESHOLD (HAILO15_ISP_CID_WDR_BASE + 0x0006)
 #define HAILO15_ISP_CID_WDR_CONTRAST (HAILO15_ISP_CID_WDR_BASE + 0x0007)
+#define HAILO15_ISP_CID_WDR_MODE (HAILO15_ISP_CID_WDR_BASE + 0x0008)
 
 int hailo15_isp_wdrv4_ctrl_count(void);
 int hailo15_isp_wdrv4_ctrl_create(struct hailo15_isp_device *isp_dev);

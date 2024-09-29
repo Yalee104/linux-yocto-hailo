@@ -23,37 +23,7 @@
 #include <linux/of_reserved_mem.h>
 #include <linux/slab.h>
 
-#define DSP_IRAM_ADDRESS (0x60180000)
-#define DSP_IRAM_SIZE (0x4000)
-#define DSP_DRAM0_ADDRESS (0x60100000)
-#define DSP_DRAM0_SIZE (0x60000)
-#define DSP_DRAM1_ADDRESS (0x60200000)
-#define DSP_DRAM1_SIZE (0x60000)
-
-/* Register offsets */
-#define DSP_CONFIG__DSP_CFG (0x4)
-#define DSP_CONFIG__AltResetVec (0x8)
-#define DSP_CONFIG__DSP_PARITY_ERR_MASK (0x194)
-#define DSP_CONFIG__DSP_IP_FAULT_MASK (0x1a4)
-#define DSP_CONFIG__DSP_INT_FATAL_MASK (0x1b4)
-#define DSP_CONFIG__DSP_INT_NONFATAL_MASK (0x1bc)
-#define DSP_CONFIG__DSP_ERR_IRQ_MASK (0x1c4)
-#define DSP_CONFIG__RUNSTALL (0x1d4)
-#define DSP_CONFIG__DSP_FAULT_MASK_0 (0x1e0)
-#define DSP_CONFIG__DSP_FAULT_MASK_1 (0x1e4)
-#define DSP_CONFIG__DSP_AXI_MASTER(x) (0x1e8 + 4 * (x))
-
-#define DSP_CONFIG__PHYSICAL_ADDRESS_BITS(addr) (((uint64_t)(addr) >> 27) & 0x1ff)
-#define DSP_CONFIG__DSP_ADDRESS_BITS(addr) (((uint32_t)(addr) >> 27) & 0xf)
-
-/* DSP_CFG offsets */
-#define DSP_CONFIG__WWDT_EXT_COUNTER_DIS__OFFSET (18)
-
-#define dsp_config_writel(xvp, reg, value) _dsp_config_writel((xvp), DSP_CONFIG__##reg, (value))
-#define dsp_config_readl(xvp, reg) _dsp_config_readl((xvp), DSP_CONFIG__##reg)
-#define DSP_CONFIG_BIT(name) (1 << DSP_CONFIG__##name##__OFFSET)
-
-static void _dsp_config_writel(struct xvp *xvp, size_t offset, u32 value)
+void _dsp_config_writel(struct xvp *xvp, size_t offset, u32 value)
 {
     if (!__clk_is_enabled(xvp->dsp_config_clock)) {
         dev_err(xvp->dev, "Trying to access dsp config with disabled clock. Aborting\n");
@@ -63,7 +33,7 @@ static void _dsp_config_writel(struct xvp *xvp, size_t offset, u32 value)
     iowrite32(value, xvp->dsp_config + offset);
 }
 
-static u32 _dsp_config_readl(struct xvp *xvp, size_t offset)
+u32 _dsp_config_readl(struct xvp *xvp, size_t offset)
 {
     if (!__clk_is_enabled(xvp->dsp_config_clock)) {
         dev_err(xvp->dev, "Trying to access dsp config with disabled clock. Aborting\n");
@@ -75,16 +45,16 @@ static u32 _dsp_config_readl(struct xvp *xvp, size_t offset)
 
 void map_dsp_to_physical_address(struct xvp *xvp, uint32_t dsp_address, phys_addr_t physical_address)
 {
-    int offset = DSP_CONFIG__DSP_ADDRESS_BITS(dsp_address);
-    int phys_offset = DSP_CONFIG__PHYSICAL_ADDRESS_BITS(physical_address);
-    dev_dbg(xvp->dev, "Mapping dsp lut %d to address %x\n", offset, phys_offset);
-    dsp_config_writel(xvp, DSP_AXI_MASTER(offset), phys_offset);
+    return xvp->hw_ops->map_dsp_to_physical_address(xvp, dsp_address, physical_address);
 }
 
-// Configure the DSP_AXI_MASTER registers in dsp_config
-// Used to map the DSP's 32 bit address space to 35 bit address space
 static void configure_axi_master_lut(struct xvp *xvp)
 {
+    // Configure the DSP_AXI_MASTER registers in dsp_config
+    // Used to map the DSP's 32 bit address space to 35 bit address space
+
+    dev_dbg(xvp->dev, "Configure AXI lookup table\n");
+    
     // DSP ==> Physical
 
     // map DSP code to 0x80000000
@@ -97,6 +67,7 @@ static void configure_axi_master_lut(struct xvp *xvp)
     map_dsp_to_physical_address(xvp, DSP_FASTBUS_MEM_MAPPED, 0x60000000);
 
     // map dsp config
+    // dsp config axi is at dsp config + 0x1000, so it will also be mapped
     map_dsp_to_physical_address(xvp, DSP_CONFIG_MAPPED, xvp->dsp_config_phys);
 
     // map log buffer
@@ -108,22 +79,20 @@ static void configure_axi_master_lut(struct xvp *xvp)
 
 static void disable_wwdt(struct xvp *xvp)
 {
-    uint32_t dsp_cfg_value;
     dev_dbg(xvp->dev, "Disable WWDT\n");
-    dsp_cfg_value = dsp_config_readl(xvp, DSP_CFG);
-    dsp_config_writel(xvp, DSP_CFG, dsp_cfg_value | DSP_CONFIG_BIT(WWDT_EXT_COUNTER_DIS));
+    xvp->hw_ops->disable_wwdt(xvp);
 }
 
 static void open_interrupts(struct xvp *xvp)
 {
     dev_dbg(xvp->dev, "Open DSP interrutps\n");
-    dsp_config_writel(xvp, DSP_INT_FATAL_MASK, 0xFFFFFFFF);
-    dsp_config_writel(xvp, DSP_INT_NONFATAL_MASK, 0xFFFFFFFF);
-    dsp_config_writel(xvp, DSP_IP_FAULT_MASK, 0xFFFFFFFF);
-    dsp_config_writel(xvp, DSP_ERR_IRQ_MASK, 0xFFFFFFFF);
-    dsp_config_writel(xvp, DSP_FAULT_MASK_0, 0xFFFFFFFF);
-    dsp_config_writel(xvp, DSP_FAULT_MASK_1, 0xFFFFFFFF);
-    dsp_config_writel(xvp, DSP_PARITY_ERR_MASK, 0xFFFFFFFF);
+    xvp->hw_ops->open_interrupts(xvp);
+}
+
+static void configure_reset_vector(struct xvp *xvp)
+{
+    dev_dbg(xvp->dev, "Configure reset vector\n");
+    xvp->hw_ops->configure_reset_vector(xvp);
 }
 
 static int dsp_config_poweron(struct xvp *xvp)
@@ -169,7 +138,7 @@ static int dsp_poweron(struct xvp *xvp)
 
     dsp_config_poweroff(xvp);
 
-    ret = clk_set_rate(xvp->dsp_pll_clock, pll_rate);
+    ret = clk_set_rate(xvp->dsp_clock, pll_rate);
     if (ret) {
         dev_err(xvp->dev, "Error in clock set rate (%d)\n", ret);
         goto exit;
@@ -209,12 +178,6 @@ static int dsp_poweroff(struct xvp *xvp)
     }
 
     return 0;
-}
-
-static void configure_reset_vector(struct xvp *xvp)
-{
-    dev_dbg(xvp->dev, "Configure reset vector\n");
-    dsp_config_writel(xvp, AltResetVec, xvp->reset_vector_address);
 }
 
 bool xrp_is_cmd_complete(struct xvp *xvp, struct xrp_comm *xrp_comm)
@@ -261,12 +224,7 @@ static long init_memories(struct platform_device *pdev, struct xvp *xvp)
     struct resource res;
     struct device_node *node;
 
-    xvp->mem_ranges.local[LOCAL_MEM_RANGES_IRAM].start = DSP_IRAM_ADDRESS;
-    xvp->mem_ranges.local[LOCAL_MEM_RANGES_IRAM].end = DSP_IRAM_ADDRESS + DSP_IRAM_SIZE;
-    xvp->mem_ranges.local[LOCAL_MEM_RANGES_DRAM0].start = DSP_DRAM0_ADDRESS;
-    xvp->mem_ranges.local[LOCAL_MEM_RANGES_DRAM0].end = DSP_DRAM0_ADDRESS + DSP_DRAM0_SIZE;
-    xvp->mem_ranges.local[LOCAL_MEM_RANGES_DRAM1].start = DSP_DRAM1_ADDRESS;
-    xvp->mem_ranges.local[LOCAL_MEM_RANGES_DRAM1].end = DSP_DRAM1_ADDRESS + DSP_DRAM1_SIZE;
+    xvp->hw_ops->init_mem_ranges(xvp);
 
     fw_mem_idx = of_property_match_string(pdev->dev.of_node, "memory-region-names", "dsp-fw");
     node = of_parse_phandle(pdev->dev.of_node, "memory-region", fw_mem_idx);
@@ -378,20 +336,20 @@ int xrp_disable_dsp(struct xvp *xvp)
 void xrp_halt_dsp(struct xvp *xvp)
 {
     dev_dbg(xvp->dev, "halt\n");
-    dsp_config_writel(xvp, RUNSTALL, 1);
+    xvp->hw_ops->xrp_halt_dsp(xvp);
 }
 
 void xrp_release_dsp(struct xvp *xvp)
 {
     dev_dbg(xvp->dev, "release\n");
-    dsp_config_writel(xvp, RUNSTALL, 0);
+    xvp->hw_ops->xrp_release_dsp(xvp);
 }
 
 void xrp_send_device_irq(struct xvp *xvp)
 {
     int err = mbox_send_message(xvp->mbox_chan, "");
     if (err < 0) {
-        pr_err("mbox_send_message error %d\n", err);
+        dev_err(xvp->dev, "mbox_send_message error %d\n", err);
     }
 }
 
@@ -419,14 +377,10 @@ void xrp_memset_hw(void __iomem *to, int c, size_t sz)
     }
 }
 
-long xrp_init_hw(struct platform_device *pdev, struct xvp *xvp)
+long xrp_init_hw_common(struct platform_device *pdev, struct xvp *xvp)
 {
     struct resource *mem;
     long ret;
-
-    xvp->dev = &pdev->dev;
-
-    dev_dbg(&pdev->dev, "%s\n", __func__);
 
     mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
     if (!mem) {
@@ -452,13 +406,6 @@ long xrp_init_hw(struct platform_device *pdev, struct xvp *xvp)
     xvp->dsp_config_clock = devm_clk_get(&pdev->dev, "dsp-config-clock");
     if (IS_ERR(xvp->dsp_config_clock)) {
         ret = dev_err_probe(&pdev->dev, PTR_ERR(xvp->dsp_config_clock), "Error in getting config clock object\n");
-        goto err;
-    }
-
-    dev_dbg(&pdev->dev, "Requesting PLL clock object\n");
-    xvp->dsp_pll_clock = devm_clk_get(&pdev->dev, "dsp-pll-clock");
-    if (IS_ERR(xvp->dsp_pll_clock)) {
-        ret = dev_err_probe(&pdev->dev, PTR_ERR(xvp->dsp_pll_clock), "Error in getting PLL clock object\n");
         goto err;
     }
 

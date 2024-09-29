@@ -393,7 +393,6 @@ static long xrp_init_common(struct platform_device *pdev, struct xvp *xvp)
 
     spin_lock_init(&xvp->busy_list_lock);
 
-    xvp->dev = &pdev->dev;
     platform_set_drvdata(pdev, xvp);
 
     mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
@@ -539,11 +538,22 @@ err:
 
 typedef long xrp_init_function(struct platform_device *pdev, struct xvp *xvp);
 
-static long xrp_init_cma(struct platform_device *pdev, struct xvp *xvp)
+static long xrp_init_hailo15(struct platform_device *pdev, struct xvp *xvp)
 {
     long ret;
 
-    ret = xrp_init_hw(pdev, xvp);
+    ret = xrp_init_hw_hailo15(pdev, xvp);
+    if (ret < 0)
+        return ret;
+
+    return xrp_init_common(pdev, xvp);
+}
+
+static long xrp_init_hailo15l(struct platform_device *pdev, struct xvp *xvp)
+{
+    long ret;
+
+    ret = xrp_init_hw_hailo15l(pdev, xvp);
     if (ret < 0)
         return ret;
 
@@ -573,8 +583,12 @@ static int xrp_deinit(struct platform_device *pdev)
 
 static const struct of_device_id xrp_of_match[] = {
     {
-        .compatible = "cdns,xrp-hailo,cma",
-        .data = xrp_init_cma,
+        .compatible = "hailo,hailo15-dsp",
+        .data = xrp_init_hailo15,
+    },
+    {
+        .compatible = "hailo,hailo15l-dsp",
+        .data = xrp_init_hailo15l,
     },
     {},
 };
@@ -597,6 +611,8 @@ static int xrp_probe(struct platform_device *pdev)
     if (!xvp) {
         return -ENOMEM;
     }
+
+    xvp->dev = &pdev->dev;
 
     init = match->data;
     ret = init(pdev, xvp);

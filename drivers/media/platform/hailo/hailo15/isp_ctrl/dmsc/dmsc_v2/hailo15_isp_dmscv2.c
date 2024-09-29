@@ -119,6 +119,7 @@ static int hailo15_isp_dmscv2_s_ctrl(struct v4l2_ctrl *ctrl)
 	case HAILO15_ISP_CID_DMSC_SKIN_CR_THR_MIN:
 	case HAILO15_ISP_CID_DMSC_SKIN_Y_THR_MAX:
 	case HAILO15_ISP_CID_DMSC_SKIN_Y_THR_MIN:
+	case HAILO15_ISP_CID_DMSC_MODE:
 		ret = hailo15_isp_s_ctrl_event(isp_dev, isp_dev->ctrl_pad,
 					       ctrl);
 		break;
@@ -194,6 +195,7 @@ static int hailo15_isp_dmscv2_g_ctrl(struct v4l2_ctrl *ctrl)
 	case HAILO15_ISP_CID_DMSC_SKIN_CR_THR_MIN:
 	case HAILO15_ISP_CID_DMSC_SKIN_Y_THR_MAX:
 	case HAILO15_ISP_CID_DMSC_SKIN_Y_THR_MIN:
+	case HAILO15_ISP_CID_DMSC_MODE:
 		ret = hailo15_isp_g_ctrl_event(isp_dev, isp_dev->ctrl_pad,
 					       ctrl);
 		break;
@@ -877,6 +879,18 @@ const struct v4l2_ctrl_config hailo15_isp_dmscv2_ctrls[] = {
 		.max = 4095,
 		.dims = { 1 },
 	},
+	{
+        /* manual/auto */
+        .ops  = &hailo15_isp_dmscv2_ctrl_ops,
+        .id   = HAILO15_ISP_CID_DMSC_MODE,
+        .type = V4L2_CTRL_TYPE_BOOLEAN,
+        .flags= V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
+        .name = "isp_dmsc_mode",
+        .step = 1,
+        .min  = 0,
+        .max  = 1,
+    },
+
 };
 
 int hailo15_isp_dmscv2_ctrl_count(void)

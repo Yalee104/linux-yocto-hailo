@@ -55,6 +55,10 @@
 #define I2S_COMP_VERSION	0x01F8
 #define I2S_COMP_TYPE		0x01FC
 
+/* @note: Valid for I2S component version >= 1.13 */
+#define IER_I2S_OP_MODE(r) (((r) & BIT(15)) >> 15)
+#define I2S_COMP_VERSION_1_13	U32_C(0x3131332A)
+
 /*
  * Component parameter register fields - define the I2S block's
  * configuration.
