@@ -110,6 +110,10 @@ static void hailo15_isp_configure_mcm_rdma(struct hailo15_isp_device* isp_dev){
 	mi_imsc = hailo15_isp_read_reg(isp_dev, MI_IMSC);
 	mi_imsc |= MCM_DMA_RAW_READY;
 	hailo15_isp_write_reg(isp_dev, MI_IMSC, mi_imsc);
+	if(isp_dev->mcm_mode == ISP_MCM_MODE_STITCHING) {
+		hailo15_isp_write_reg(isp_dev, MCM_RETIMING0, MCM_RETIMING_VSYNC);
+		hailo15_isp_write_reg(isp_dev, MCM_RETIMING1, MCM_RETIMING_HSYNC);
+	}
 }
 
 void hailo15_isp_configure_frame_size(struct hailo15_isp_device *isp_dev,

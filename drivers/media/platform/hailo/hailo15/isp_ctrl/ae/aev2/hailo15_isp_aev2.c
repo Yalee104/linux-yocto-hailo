@@ -78,6 +78,7 @@ static int hailo15_isp_aev2_s_ctrl(struct v4l2_ctrl *ctrl)
 	case HAILO15_ISP_CID_AE_ROI_WEIGHT:
 	case HAILO15_ISP_CID_AE_ROI:
 	case HAILO15_ISP_CID_AE_GAIN:
+	case HAILO15_ISP_CID_AE_SENSOR_GAIN:
 	case HAILO15_ISP_CID_AE_INTEGRATION_TIME:
 	case HAILO15_ISP_CID_AE_IRIS:
 	case HAILO15_ISP_CID_AE_IRIS_LIMITS:
@@ -120,6 +121,7 @@ static int hailo15_isp_aev2_g_ctrl(struct v4l2_ctrl *ctrl)
 	case HAILO15_ISP_CID_AE_ROI_WEIGHT:
 	case HAILO15_ISP_CID_AE_ROI:
 	case HAILO15_ISP_CID_AE_GAIN:
+	case HAILO15_ISP_CID_AE_SENSOR_GAIN:
 	case HAILO15_ISP_CID_AE_INTEGRATION_TIME:
 	case HAILO15_ISP_CID_AE_EXP_STATUS:
 	case HAILO15_ISP_CID_AE_IRIS:
@@ -129,6 +131,8 @@ static int hailo15_isp_aev2_g_ctrl(struct v4l2_ctrl *ctrl)
 	case HAILO15_ISP_CID_AE_HIST_MODE:
 	case HAILO15_ISP_CID_AE_HIST_WINDOW:
 	case HAILO15_ISP_CID_AE_HIST_WEIGHT:
+	case HAILO15_ISP_CID_AE_HDR_GAINS:
+	case HAILO15_ISP_CID_AE_HDR_INTEGRATION_TIMES:
 	case HAILO15_ISP_CID_AE_EXP_INPUT:
 	case HAILO15_ISP_CID_AE_EXP_WINDOW:
 		pr_debug("%s - got g_ctrl with id: 0x%x\n", __func__, ctrl->id);
@@ -460,6 +464,44 @@ const struct v4l2_ctrl_config hailo15_isp_aev2_ctrls[] = {
         .min  = 0,
         .max  = 0xFFFF,
         .dims = {4},
+    },
+    {
+        /* float 0.00 ~ 99.99 */
+        .ops = &hailo15_isp_aev2_ctrl_ops,
+        .id = HAILO15_ISP_CID_AE_SENSOR_GAIN,
+        .type = V4L2_CTRL_TYPE_INTEGER,
+        .flags = V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
+        .name = "isp_ae_sensor_gain",
+        .step = 1,
+        .min = 1024,
+        .max = 0x7FFFFFFF,
+        .def = 1024,
+    },
+	{
+        /* integer array (3 elements - long, short, very short) */
+        .ops  = &hailo15_isp_aev2_ctrl_ops,
+        .id   = HAILO15_ISP_CID_AE_HDR_GAINS,
+        .type = V4L2_CTRL_TYPE_U32,
+        .flags= V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
+        .name = "isp_ae_hdr_gains",
+        .step = 1,
+        .min  = 1024,
+        .max  = 0x7FFFFFFF,
+        .dims = {3},
+        .def = 1024,
+    },
+	{
+        /* float array 0.000001 ~ 0.999999, with 3 elements (long, short, very short) */
+        .ops  = &hailo15_isp_aev2_ctrl_ops,
+        .id   = HAILO15_ISP_CID_AE_HDR_INTEGRATION_TIMES,
+        .type = V4L2_CTRL_TYPE_U32,
+        .flags= V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_EXECUTE_ON_WRITE,
+        .name = "isp_ae_hdr_integration_times",
+        .step = 1,
+        .min = 1,
+        .max = 999999,
+        .dims = {3},
+        .def = 1,
     },
 };
 

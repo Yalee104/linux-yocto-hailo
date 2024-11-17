@@ -32,6 +32,8 @@
 #define IMX678_MAX_LPFR_4K (1 << 20) - 2 // max even value of unsigned 20bit
 #define IMX678_MAX_VBLANK_4K (IMX678_MAX_LPFR_4K - 2160) // vmax - height
 
+#define IMX678_REG_HMAX 0x302C
+
 /* defaults */
 #define IMX678_DEFAULT_RHS1 0x91
 #define IMX678_DEFAULT_RHS2 0xaa
@@ -44,6 +46,8 @@
 #define IMX678_SHR1_RHS1_GAP 3
 #define IMX678_SHR2_RHS1_GAP 7
 #define IMX678_SHR2_RHS2_GAP 3
+
+#define IMX678_INTEGER_STEP 1
 
 /* Exposure control LEF */
 #define IMX678_REG_SHUTTER 0x3050
@@ -102,6 +106,7 @@ typedef enum {
 } ExposureType;
 
 static int imx678_set_ctrl(struct v4l2_ctrl *ctrl);
+static int imx678_get_ctrl(struct v4l2_ctrl *ctrl);
 
 /*
  * imx678 test pattern related structure
@@ -143,6 +148,11 @@ static const char *const imx678_test_pattern_menu[] = {
 /* V4l2 subdevice control ops*/
 static const struct v4l2_ctrl_ops imx678_ctrl_ops = {
 	.s_ctrl = imx678_set_ctrl,
+};
+
+/* V4l2 subdevice control ops*/
+static const struct v4l2_ctrl_ops imx678_get_ctrl_ops = {
+	.g_volatile_ctrl = imx678_get_ctrl,
 };
 
 /**
@@ -269,6 +279,13 @@ struct imx678 {
 	struct v4l2_ctrl *pclk_ctrl;
 	struct v4l2_ctrl *hblank_ctrl;
 	struct v4l2_ctrl *vblank_ctrl;
+	struct v4l2_ctrl *rhs1_ctrl;
+	struct v4l2_ctrl *rhs2_ctrl;
+	struct v4l2_ctrl *shr0_ctrl;
+	struct v4l2_ctrl *shr1_ctrl;
+	struct v4l2_ctrl *shr2_ctrl;
+	struct v4l2_ctrl *vmax_ctrl;
+	struct v4l2_ctrl *hmax_ctrl;
 	struct v4l2_ctrl *test_pattern_ctrl;
 	struct v4l2_ctrl *mode_sel_ctrl;
 	struct exp_gain_ctrl_cluster lef;
@@ -1274,8 +1291,8 @@ static const struct imx678_reg mode_4k_2dol_all_pixel[] = {
 	{ 0x3058, 0x4A }, /* SHR2[19:0] */
 	{ 0x3059, 0x00 },
 	/* 0x305A: Using default value */
-	{ 0x3060, 0x8D }, /* RHS1[19:0] */
-	{ 0x3061, 0x00 },
+	{ 0x3060, 0xcd }, /* RHS1[19:0] */
+	{ 0x3061, 0x05 },
 	/* 0x3062: Using default value */
 	{ 0x3064, 0x53 }, /* RHS2[19:0] */
 	{ 0x3065, 0x00 },
@@ -2581,7 +2598,7 @@ static const struct imx678_mode supported_hdr_modes[] = {
     .vblank = 90,
     .vblank_min = 90,
     .vblank_max = 132840,
-	.rhs1 = 0x8D,
+	.rhs1 = 0x5cd,
     .pclk = 594000000,
     .link_freq_idx = 0,
     .code = MEDIA_BUS_FMT_SRGGB12_2X12,
@@ -2699,6 +2716,62 @@ struct v4l2_ctrl_config imx678_3dol_ctrls[] = {
 		.name = "exposure_very_short",
 		.step = IMX678_EXPOSURE_VERY_SHORT_STEP,
 	},
+	{
+		.ops = &imx678_get_ctrl_ops,
+		.id = IMX678_CID_RHS1,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.flags = V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_VOLATILE,
+		.name = "readout_timing_short",
+		.step = IMX678_INTEGER_STEP,
+	},
+	{
+		.ops = &imx678_get_ctrl_ops,
+		.id = IMX678_CID_RHS2,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.flags = V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_VOLATILE,
+		.name = "readout_timing_very_short",
+		.step = IMX678_INTEGER_STEP,
+	},
+	{
+		.ops = &imx678_get_ctrl_ops,
+		.id = IMX678_CID_SHR0,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.flags = V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_VOLATILE,
+		.name = "shutter_timing_long",
+		.step = IMX678_INTEGER_STEP,
+	},
+	{
+		.ops = &imx678_get_ctrl_ops,
+		.id = IMX678_CID_SHR1,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.flags = V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_VOLATILE,
+		.name = "shutter_timing_short",
+		.step = IMX678_EXPOSURE_SHORT_STEP,
+	},
+	{
+		.ops = &imx678_get_ctrl_ops,
+		.id = IMX678_CID_SHR2,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.flags = V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_VOLATILE,
+		.name = "shutter_timing_very_short",
+		.step = IMX678_EXPOSURE_VERY_SHORT_STEP,
+	},
+	{
+		.ops = &imx678_get_ctrl_ops,
+		.id = IMX678_CID_VMAX,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.flags = V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_VOLATILE,
+		.name = "vertical_span",
+		.step = IMX678_INTEGER_STEP,
+	},
+	{
+		.ops = &imx678_get_ctrl_ops,
+		.id = IMX678_CID_HMAX,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.flags = V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_VOLATILE,
+		.name = "horizontal_span",
+		.step = IMX678_INTEGER_STEP,
+	},	
 };
 
 static void convert_v4l2_subdev_code_to_sensor_code(struct imx678* imx678, struct v4l2_mbus_framefmt* fmt) {
@@ -3039,6 +3112,41 @@ static int imx678_set_test_pattern(struct imx678 *imx678, int val)
 						ARRAY_SIZE(imx678_tpg_en_regs));
 		}
 	}
+	return ret;
+}
+
+static int imx678_get_ctrl(struct v4l2_ctrl *ctrl)
+{
+	int ret = 0;
+	struct imx678 *imx678 = container_of(ctrl->handler, struct imx678, ctrl_handler);
+
+	switch (ctrl->id) {
+	case IMX678_CID_RHS1:
+		ctrl->val = imx678->cur_mode->rhs1;
+		break;
+	case IMX678_CID_RHS2:
+		ctrl->val = imx678->cur_mode->rhs2;
+		break;
+	case IMX678_CID_SHR0:
+		ret = imx678_read_reg(imx678, IMX678_REG_SHUTTER, 3, &ctrl->val);
+		break;
+	case IMX678_CID_SHR1:
+		ret = imx678_read_reg(imx678, IMX678_REG_SHUTTER_SHORT, 3, &ctrl->val);
+		break;
+	case IMX678_CID_SHR2:
+		ret = imx678_read_reg(imx678, IMX678_REG_SHUTTER_VERY_SHORT, 3, &ctrl->val);
+		break;
+	case IMX678_CID_VMAX:
+		ret = imx678_read_reg(imx678, IMX678_REG_LPFR, 3, &ctrl->val);
+		break;
+	case IMX678_CID_HMAX:
+		ret = imx678_read_reg(imx678, IMX678_REG_HMAX, 2, &ctrl->val);
+		break;
+	default:
+		dev_err(imx678->dev, "Invalid control %d", ctrl->id);
+		return -EINVAL;
+	}
+
 	return ret;
 }
 
@@ -3870,6 +3978,29 @@ static int imx678_init_controls(struct imx678 *imx678)
 				     &imx678_3dol_ctrls[ctrl_3dol_idx], NULL);
 	
 	v4l2_ctrl_cluster(2, &imx678->sef2.exp_ctrl);
+
+	// Read only HDR regs
+	ctrl_3dol_idx = get_3dol_ctrl_index_by_name("readout_timing_short");
+	imx678->rhs1_ctrl = v4l2_ctrl_new_custom(ctrl_hdlr, &imx678_3dol_ctrls[ctrl_3dol_idx], NULL);
+
+	ctrl_3dol_idx = get_3dol_ctrl_index_by_name("readout_timing_very_short");
+	imx678->rhs2_ctrl = v4l2_ctrl_new_custom(ctrl_hdlr, &imx678_3dol_ctrls[ctrl_3dol_idx], NULL);
+
+	ctrl_3dol_idx = get_3dol_ctrl_index_by_name("shutter_timing_long");
+	imx678->shr0_ctrl = v4l2_ctrl_new_custom(ctrl_hdlr, &imx678_3dol_ctrls[ctrl_3dol_idx], NULL);
+
+	ctrl_3dol_idx = get_3dol_ctrl_index_by_name("shutter_timing_short");
+	imx678->shr1_ctrl = v4l2_ctrl_new_custom(ctrl_hdlr, &imx678_3dol_ctrls[ctrl_3dol_idx], NULL);
+
+	ctrl_3dol_idx = get_3dol_ctrl_index_by_name("shutter_timing_very_short");
+	imx678->shr2_ctrl = v4l2_ctrl_new_custom(ctrl_hdlr, &imx678_3dol_ctrls[ctrl_3dol_idx], NULL);
+
+	ctrl_3dol_idx = get_3dol_ctrl_index_by_name("vertical_span");
+	imx678->vmax_ctrl = v4l2_ctrl_new_custom(ctrl_hdlr, &imx678_3dol_ctrls[ctrl_3dol_idx], NULL);
+
+	ctrl_3dol_idx = get_3dol_ctrl_index_by_name("horizontal_span");
+	imx678->hmax_ctrl = v4l2_ctrl_new_custom(ctrl_hdlr, &imx678_3dol_ctrls[ctrl_3dol_idx], NULL);
+
 
 	imx678->vblank_ctrl =
 		v4l2_ctrl_new_std(ctrl_hdlr, &imx678_ctrl_ops, V4L2_CID_VBLANK,
